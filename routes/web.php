@@ -10,16 +10,26 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\MessageController;
 use App\Http\Controllers\MpesaController;
 
-// Public routes
+
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 // Authentication routes (without register)
 Auth::routes(['register' => false]);
 
-// Dashboard redirect after login
-Route::get('/home', [HomeController::class, 'index'])->name('home');
+// Custom route for register to show "not hiring" message
+Route::get('/register', function() {
+    return view('auth.not-hiring');
+})->name('not-hiring');
+
+Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+Route::get('/failed', function () {
+    // Pass the authenticated user to the view if available
+    return view('failed', ['user' => Auth::user()]);
+})->name('failed');
+
 
 // Admin routes
 Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {

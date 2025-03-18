@@ -15,8 +15,17 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('phone')->unique();
+            $table->string('usertype')->default('admin');
+            $table->string('status')->default('pending');
+            $table->string('profile_picture')->nullable();
+            $table->string('is_suspended')->default('no');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->text('bio')->nullable();
+            $table->decimal('rating', 3, 1)->nullable();
+            $table->string('specialization')->nullable();
+            $table->timestamp('last_active_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -36,7 +45,7 @@ return new class extends Migration
             $table->integer('last_activity')->index();
         });
     }
-
+        
     /**
      * Reverse the migrations.
      */
