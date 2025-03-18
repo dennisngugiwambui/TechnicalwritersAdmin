@@ -156,27 +156,42 @@
                     </button>
                     
                     <div x-show="open" class="pl-4 mt-1 space-y-1" x-collapse>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.orders.index') && !request()->has('status') ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index') }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.orders.index') && !request()->has('status') ? 'text-primary-500' : '' }}">
                             <i class="fas fa-list-ul w-4 h-4 mr-3"></i>
                             <span>All Orders</span>
+                            <span class="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['all'] ?? 0 }}</span>
                         </a>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'available' ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index', ['status' => 'available']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'available' ? 'text-primary-500' : '' }}">
                             <i class="fas fa-clipboard w-4 h-4 mr-3"></i>
                             <span>Available</span>
+                            <span class="ml-auto bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['available'] ?? 0 }}</span>
                         </a>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'in_progress' ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index', ['status' => 'in_progress']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'in_progress' ? 'text-primary-500' : '' }}">
                             <i class="fas fa-clock w-4 h-4 mr-3"></i>
                             <span>In Progress</span>
+                            <span class="ml-auto bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['in_progress'] ?? 0 }}</span>
                         </a>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'revision' ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index', ['status' => 'revision']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'revision' ? 'text-primary-500' : '' }}">
                             <i class="fas fa-undo w-4 h-4 mr-3"></i>
                             <span>Revision</span>
+                            <span class="ml-auto bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['revision'] ?? 0 }}</span>
                         </a>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'completed' ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index', ['status' => 'completed']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'completed' ? 'text-primary-500' : '' }}">
                             <i class="fas fa-check-circle w-4 h-4 mr-3"></i>
                             <span>Completed</span>
+                            <span class="ml-auto bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['completed'] ?? 0 }}</span>
                         </a>
-                        <a href="" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.orders.create') ? 'text-primary-500' : '' }}">
+                        <a href="{{ route('admin.orders.index', ['status' => 'dispute']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'dispute' ? 'text-primary-500' : '' }}">
+                            <i class="fas fa-exclamation-triangle w-4 h-4 mr-3"></i>
+                            <span>Disputes</span>
+                            <span class="ml-auto bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['dispute'] ?? 0 }}</span>
+                        </a>
+                        <a href="{{ route('admin.orders.index', ['status' => 'cancelled']) }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->has('status') && request()->status == 'cancelled' ? 'text-primary-500' : '' }}">
+                            <i class="fas fa-ban w-4 h-4 mr-3"></i>
+                            <span>Cancelled</span>
+                            <span class="ml-auto bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $orderCounts['cancelled'] ?? 0 }}</span>
+                        </a>
+                        <a href="{{ route('admin.orders.create') }}" class="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.orders.create') ? 'text-primary-500' : '' }}">
                             <i class="fas fa-plus w-4 h-4 mr-3"></i>
                             <span>Create Order</span>
                         </a>
@@ -184,25 +199,28 @@
                 </div>
                 
                 <!-- Writers -->
-                <a href="" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.writers.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.writers.index') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.writers.*') ? 'active' : '' }}">
                     <i class="fas fa-users w-5 h-5 mr-3"></i>
                     <span>Writers</span>
                 </a>
                 
                 <!-- Payments -->
-                <a href="" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.payments.index') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
                     <i class="fas fa-money-bill-wave w-5 h-5 mr-3"></i>
                     <span>Payments</span>
                 </a>
                 
                 <!-- Messages -->
-                <a href="" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.messages.index') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
                     <i class="fas fa-comment-alt w-5 h-5 mr-3"></i>
                     <span>Messages</span>
+                    @if($unreadMessageCount > 0)
+                    <span class="ml-auto bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $unreadMessageCount }}</span>
+                    @endif
                 </a>
                 
                 <!-- Settings -->
-                <a href="" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.settings') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
                     <i class="fas fa-cog w-5 h-5 mr-3"></i>
                     <span>Settings</span>
                 </a>
@@ -214,7 +232,7 @@
                     <div class="flex items-center space-x-3">
                         <div class="flex-shrink-0">
                             @if(Auth::user()->profile_picture)
-                                <img class="h-10 w-10 rounded-full object-cover" src="" alt="{{ Auth::user()->name }}">
+                                <img class="h-10 w-10 rounded-full object-cover" src="{{ asset(Auth::user()->profile_picture) }}" alt="{{ Auth::user()->name }}">
                             @else
                                 <div class="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-semibold">
                                     {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
@@ -235,10 +253,10 @@
                             </button>
                             <div x-show="open" @click.away="open = false" class="origin-bottom-left absolute right-0 bottom-full mb-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
                                 <div class="py-1" role="menu" aria-orientation="vertical">
-                                    <a href="" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
+                                    <a href="{{ route('admin.profile.show') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                         <i class="fas fa-user mr-2"></i> Profile
                                     </a>
-                                    <form method="POST" action="">
+                                    <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                             <i class="fas fa-sign-out-alt mr-2"></i> Logout
@@ -289,7 +307,11 @@
                             <button @click="open = !open" class="relative p-2 text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                                 <span class="sr-only">View notifications</span>
                                 <i class="fas fa-bell"></i>
-                                <span class="absolute top-0 right-0 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-xs font-bold text-white">3</span>
+                                @if($unreadMessageCount > 0)
+                                <span class="absolute top-0 right-0 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-xs font-bold text-white">
+                                    {{ $unreadMessageCount > 9 ? '9+' : $unreadMessageCount }}
+                                </span>
+                                @endif
                             </button>
                             
                             <div x-show="open" @click.away="open = false" class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95">
@@ -298,48 +320,29 @@
                                         <h3 class="text-sm font-semibold text-gray-900">Notifications</h3>
                                     </div>
                                     
-                                    <!-- Notification items -->
-                                    <a href="#" class="flex px-4 py-3 hover:bg-gray-50 border-b">
-                                        <div class="flex-shrink-0">
-                                            <div class="h-10 w-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-500">
-                                                <i class="fas fa-clipboard-check"></i>
+                                    @if(count($recentMessages) > 0)
+                                        @foreach($recentMessages as $message)
+                                        <a href="{{ route('admin.messages.show', $message->id) }}" class="flex px-4 py-3 hover:bg-gray-50 border-b">
+                                            <div class="flex-shrink-0">
+                                                <div class="h-10 w-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-500">
+                                                    <i class="fas fa-comment-alt"></i>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div class="ml-3 flex-1">
-                                            <p class="text-sm font-medium text-gray-900">New order completed</p>
-                                            <p class="text-sm text-gray-500">Order #123456 has been completed.</p>
-                                            <p class="text-xs text-gray-400 mt-1">30 minutes ago</p>
-                                        </div>
-                                    </a>
-                                    
-                                    <a href="#" class="flex px-4 py-3 hover:bg-gray-50 border-b">
-                                        <div class="flex-shrink-0">
-                                            <div class="h-10 w-10 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-500">
-                                                <i class="fas fa-exclamation-triangle"></i>
+                                            <div class="ml-3 flex-1">
+                                                <p class="text-sm font-medium text-gray-900">{{ $message->title ?? 'New message' }}</p>
+                                                <p class="text-sm text-gray-500">{{ Str::limit($message->message, 50) }}</p>
+                                                <p class="text-xs text-gray-400 mt-1">{{ $message->created_at->diffForHumans() }}</p>
                                             </div>
+                                        </a>
+                                        @endforeach
+                                    @else
+                                        <div class="py-4 text-center text-sm text-gray-500">
+                                            No new notifications
                                         </div>
-                                        <div class="ml-3 flex-1">
-                                            <p class="text-sm font-medium text-gray-900">Revision requested</p>
-                                            <p class="text-sm text-gray-500">Order #789012 needs revision.</p>
-                                            <p class="text-xs text-gray-400 mt-1">2 hours ago</p>
-                                        </div>
-                                    </a>
-                                    
-                                    <a href="#" class="flex px-4 py-3 hover:bg-gray-50">
-                                        <div class="flex-shrink-0">
-                                            <div class="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                                                <i class="fas fa-user-plus"></i>
-                                            </div>
-                                        </div>
-                                        <div class="ml-3 flex-1">
-                                            <p class="text-sm font-medium text-gray-900">New writer registration</p>
-                                            <p class="text-sm text-gray-500">John Doe has registered as a writer.</p>
-                                            <p class="text-xs text-gray-400 mt-1">5 hours ago</p>
-                                        </div>
-                                    </a>
+                                    @endif
                                     
                                     <div class="px-4 py-2 text-center border-t">
-                                        <a href="#" class="text-sm font-medium text-primary-500 hover:text-primary-600">View all notifications</a>
+                                        <a href="{{ route('admin.messages.index') }}" class="text-sm font-medium text-primary-500 hover:text-primary-600">View all notifications</a>
                                     </div>
                                 </div>
                             </div>
@@ -365,13 +368,13 @@
                             
                             <div x-show="open" @click.away="open = false" class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95">
                                 <div class="py-1" role="menu" aria-orientation="vertical">
-                                    <a href="" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
+                                    <a href="{{ route('admin.profile.show') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                         <i class="fas fa-user mr-2"></i> Profile
                                     </a>
-                                    <a href="" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
+                                    <a href="{{ route('admin.settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                         <i class="fas fa-cog mr-2"></i> Settings
                                     </a>
-                                    <form method="POST" action="">
+                                    <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                             <i class="fas fa-sign-out-alt mr-2"></i> Logout
@@ -465,5 +468,5 @@
     
     <!-- Additional Scripts -->
     @stack('scripts')
-</body>
-</html>
+ </body>
+ </html>

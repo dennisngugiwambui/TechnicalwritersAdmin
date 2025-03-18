@@ -3,14 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\WriterController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\WriterController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\MessageController;
-use App\Http\Controllers\MpesaController;
-
-
+use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\AdminHomeController;
+// Public routes
 Route::get('/', function () {
     return redirect()->route('login');
 });
@@ -23,90 +22,90 @@ Route::get('/register', function() {
     return view('auth.not-hiring');
 })->name('not-hiring');
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+// Welcome page for pending admins
+Route::get('/welcome', function() {
+    return view('admin.welcome');
+})->name('welcome')->middleware('auth');
 
-Route::get('/failed', function () {
-    // Pass the authenticated user to the view if available
-    return view('failed', ['user' => Auth::user()]);
-})->name('failed');
+// Failed access page for suspended/banned admins
+Route::get('/failed', function() {
+    return view('admin.failed', ['user' => Auth::user()]);
+})->name('failed')->middleware('auth');
 
+// Dashboard route
+Route::get('/home', [AdminHomeController::class, 'index'])->name('home');
+
+// Dashboard chart data
+Route::get('/admin/dashboard/chart-data', [AdminHomeController::class, 'getChartData'])
+    ->name('admin.dashboard.chart-data')
+    ->middleware('auth');
 
 // Admin routes
-Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
     // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/', [AdminHomeController::class, 'index'])->name('dashboard');
     
-    // Writer management
-    Route::resource('writers', WriterController::class);
-    Route::post('/writers/{writer}/suspend', [WriterController::class, 'suspend'])->name('writers.suspend');
-    Route::post('/writers/{writer}/verify', [WriterController::class, 'verify'])->name('writers.verify');
-    Route::post('/writers/{writer}/warning', [WriterController::class, 'warning'])->name('writers.warning');
-    
-    // Order management
-    Route::resource('orders', OrderController::class);
+    // Orders Management
+    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/create', [OrderController::class, 'create'])->name('orders.create');
+    Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->name('orders.edit');
+    Route::put('/orders/{order}', [OrderController::class, 'update'])->name('orders.update');
     Route::post('/orders/{order}/make-available', [OrderController::class, 'makeAvailable'])->name('orders.make-available');
-    Route::post('/orders/{order}/assign/{writer}', [OrderController::class, 'assign'])->name('orders.assign');
+    Route::post('/orders/{order}/assign', [OrderController::class, 'assign'])->name('orders.assign');
     Route::post('/orders/{order}/request-revision', [OrderController::class, 'requestRevision'])->name('orders.request-revision');
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
     Route::post('/orders/{order}/dispute', [OrderController::class, 'dispute'])->name('orders.dispute');
+    Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
     Route::post('/orders/upload-files', [OrderController::class, 'uploadFiles'])->name('orders.upload-files');
     
-    // Payment management
-    Route::resource('payments', PaymentController::class);
+    // Writers Management
+    Route::get('/writers', [WriterController::class, 'index'])->name('writers.index');
+    Route::get('/writers/{writer}', [WriterController::class, 'show'])->name('writers.show');
+    Route::post('/writers/{writer}/suspend', [WriterController::class, 'suspend'])->name('writers.suspend');
+    Route::post('/writers/{writer}/activate', [WriterController::class, 'activate'])->name('writers.activate');
+    Route::post('/writers/{writer}/verify', [WriterController::class, 'verify'])->name('writers.verify');
+    Route::post('/writers/{writer}/reject', [WriterController::class, 'reject'])->name('writers.reject');
+    
+    // Payments Management
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
-    Route::get('/settings/exchange-rate', [PaymentController::class, 'exchangeRateForm'])->name('settings.exchange-rate');
-    Route::post('/settings/exchange-rate', [PaymentController::class, 'updateExchangeRate'])->name('settings.exchange-rate.update');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    Route::post('/payments/{payment}/process-mpesa', [PaymentController::class, 'processMpesa'])->name('payments.process-mpesa');
     
-    // Messaging system
-    Route::resource('messages', MessageController::class);
-    Route::post('/messages/send-as-client', [MessageController::class, 'sendAsClient'])->name('messages.send-as-client');
-    Route::post('/messages/send-as-support', [MessageController::class, 'sendAsSupport'])->name('messages.send-as-support');
+    // Messages Management
+    Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+    Route::get('/messages/create', [MessageController::class, 'create'])->name('messages.create');
+    Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
+    Route::get('/messages/{message}', [MessageController::class, 'show'])->name('messages.show');
+    Route::post('/messages/{order}/send-as-client', [MessageController::class, 'sendAsClient'])->name('messages.send-as-client');
+    Route::post('/messages/{order}/send-as-support', [MessageController::class, 'sendAsSupport'])->name('messages.send-as-support');
+    
+    // Settings Management
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::get('/settings/exchange-rate', [SettingsController::class, 'exchangeRate'])->name('settings.exchange-rate');
+    Route::post('/settings/exchange-rate', [SettingsController::class, 'updateExchangeRate'])->name('settings.update-exchange-rate');
+    
+    // Profile routes
+    Route::get('/profile', [HomeController::class, 'profile'])->name('profile.show');
+    Route::put('/profile', [HomeController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/profile/password', [HomeController::class, 'updatePassword'])->name('profile.password');
 });
 
-// Writer routes
-Route::prefix('writer')->middleware(['auth', 'writer'])->group(function () {
-    // Writer dashboard
-    Route::get('/dashboard', [App\Http\Controllers\Writer\DashboardController::class, 'index'])->name('writer.dashboard');
-    
-    // Available orders
-    Route::get('/orders/available', [App\Http\Controllers\Writer\OrderController::class, 'available'])->name('writer.orders.available');
-    
-    // Assigned orders
-    Route::get('/orders/assigned', [App\Http\Controllers\Writer\OrderController::class, 'assigned'])->name('writer.orders.assigned');
-    
-    // Completed orders
-    Route::get('/orders/completed', [App\Http\Controllers\Writer\OrderController::class, 'completed'])->name('writer.orders.completed');
-    
-    // Order details
-    Route::get('/orders/{order}', [App\Http\Controllers\Writer\OrderController::class, 'show'])->name('writer.orders.show');
-    
-    // Submit order
-    Route::post('/orders/{order}/submit', [App\Http\Controllers\Writer\OrderController::class, 'submit'])->name('writer.orders.submit');
-    
-    // Writer finances
-    Route::get('/finances', [App\Http\Controllers\Writer\FinanceController::class, 'index'])->name('writer.finances');
-    Route::post('/finances/request-payment', [App\Http\Controllers\Writer\FinanceController::class, 'requestPayment'])->name('writer.finances.request-payment');
-    
-    // Messages
-    Route::get('/messages', [App\Http\Controllers\Writer\MessageController::class, 'index'])->name('writer.messages');
-    Route::get('/messages/{order}', [App\Http\Controllers\Writer\MessageController::class, 'show'])->name('writer.messages.show');
-    Route::post('/messages/{order}/send', [App\Http\Controllers\Writer\MessageController::class, 'send'])->name('writer.messages.send');
-});
+// Order files download route
+Route::get('/files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])
+    ->name('files.download')
+    ->middleware('auth');
 
-// Shared routes
-Route::middleware(['auth'])->group(function () {
-    // Order files
-    Route::get('/files/{file}', [App\Http\Controllers\FileController::class, 'show'])->name('files.show');
-    
-    // Profile management
-    Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'show'])->name('profile.show');
-    Route::post('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
-});
+// M-Pesa callback routes
+Route::post('/api/mpesa/callback', [App\Http\Controllers\Admin\MpesaController::class, 'callback'])
+    ->name('mpesa.callback');
 
-// M-Pesa callback
-Route::post('/mpesa/callback', [MpesaController::class, 'callback'])->name('mpesa.callback');
+Route::post('/api/mpesa/timeout', [App\Http\Controllers\Admin\MpesaController::class, 'timeout'])
+    ->name('mpesa.timeout');
 
-// Manual order scraping route (protected by admin middleware)
-Route::get('/admin/scrape-orders', [App\Http\Controllers\Admin\ScrapingController::class, 'scrape'])
-    ->middleware(['auth', 'admin'])
-    ->name('admin.scrape-orders');
+Route::post('/api/mpesa/result', [App\Http\Controllers\Admin\MpesaController::class, 'result'])
+    ->name('mpesa.result');
