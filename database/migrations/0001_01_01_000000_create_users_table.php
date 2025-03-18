@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->unique();
             $table->string('usertype')->default('admin');
-            $table->string('status')->default('pending');
+            $table->string('status')->default('active');
             $table->string('profile_picture')->nullable();
             $table->string('is_suspended')->default('no');
             $table->timestamp('email_verified_at')->nullable();
