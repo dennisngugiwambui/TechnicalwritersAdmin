@@ -1,237 +1,352 @@
 @extends('admin.app')
 
 
+
 @section('content')
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Order Details</h3>
-            <p class="mt-1 max-w-2xl text-sm text-gray-500">Fill in all required information to create a new order.</p>
-        </div>
+<div class="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Order Details</h3>
+        <p class="mt-1 text-sm text-gray-500">Complete the form below to create a new order in the system.</p>
+    </div>
+
+    <form action="{{ route('admin.orders.store') }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-6">
+        @csrf
         
-        <form action="{{ route('admin.orders.store') }}" method="POST" enctype="multipart/form-data" class="divide-y divide-gray-200">
-            @csrf
-            
-            <!-- Order Information Section -->
-            <div class="px-4 py-5 sm:p-6">
-                <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                    <div class="sm:col-span-4">
-                        <label for="title" class="block text-sm font-medium text-gray-700">Order Title <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <input type="text" name="title" id="title" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md @error('title') border-red-300 @enderror" value="{{ old('title') }}" required>
-                            @error('title')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Left Column -->
+            <div class="space-y-6">
+                <!-- Basic Order Information -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Basic Information</h4>
+                    
+                    <!-- Order Title -->
+                    <div class="mb-4">
+                        <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Order Title <span class="text-red-600">*</span></label>
+                        <input type="text" name="title" id="title" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('title') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" value="{{ old('title') }}" required>
+                        @error('title')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
-
-                    <div class="sm:col-span-3">
-                        <label for="discipline" class="block text-sm font-medium text-gray-700">Subject/Discipline <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <select id="discipline" name="discipline" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md @error('discipline') border-red-300 @enderror" required>
-                                <option value="">Select a discipline</option>
-                                <option value="Programming" {{ old('discipline') == 'Programming' ? 'selected' : '' }}>Programming</option>
-                                <option value="Data Analysis" {{ old('discipline') == 'Data Analysis' ? 'selected' : '' }}>Data Analysis</option>
-                                <option value="Business" {{ old('discipline') == 'Business' ? 'selected' : '' }}>Business</option>
-                                <option value="Nursing" {{ old('discipline') == 'Nursing' ? 'selected' : '' }}>Nursing</option>
-                                <option value="Science" {{ old('discipline') == 'Science' ? 'selected' : '' }}>Science</option>
-                                <option value="Engineering" {{ old('discipline') == 'Engineering' ? 'selected' : '' }}>Engineering</option>
-                                <option value="Arts" {{ old('discipline') == 'Arts' ? 'selected' : '' }}>Arts</option>
-                                <option value="Social Sciences" {{ old('discipline') == 'Social Sciences' ? 'selected' : '' }}>Social Sciences</option>
-                                <option value="Other" {{ old('discipline') == 'Other' ? 'selected' : '' }}>Other</option>
-                            </select>
-                            @error('discipline')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                    
+                    <!-- Type of Service -->
+                    <div class="mb-4">
+                        <label for="type_of_service" class="block text-sm font-medium text-gray-700 mb-1">Type of Service <span class="text-red-600">*</span></label>
+                        <select name="type_of_service" id="type_of_service" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('type_of_service') border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500 @enderror" required>
+                            <option value="">Select service type</option>
+                            <option value="Essay" {{ old('type_of_service') == 'Essay' ? 'selected' : '' }}>Essay</option>
+                            <option value="Research Paper" {{ old('type_of_service') == 'Research Paper' ? 'selected' : '' }}>Research Paper</option>
+                            <option value="Case Study" {{ old('type_of_service') == 'Case Study' ? 'selected' : '' }}>Case Study</option>
+                            <option value="Dissertation" {{ old('type_of_service') == 'Dissertation' ? 'selected' : '' }}>Dissertation</option>
+                            <option value="Term Paper" {{ old('type_of_service') == 'Term Paper' ? 'selected' : '' }}>Term Paper</option>
+                            <option value="Thesis" {{ old('type_of_service') == 'Thesis' ? 'selected' : '' }}>Thesis</option>
+                            <option value="Coursework" {{ old('type_of_service') == 'Coursework' ? 'selected' : '' }}>Coursework</option>
+                            <option value="Assignment" {{ old('type_of_service') == 'Assignment' ? 'selected' : '' }}>Assignment</option>
+                            <option value="Book Review" {{ old('type_of_service') == 'Book Review' ? 'selected' : '' }}>Book Review</option>
+                            <option value="Article Review" {{ old('type_of_service') == 'Article Review' ? 'selected' : '' }}>Article Review</option>
+                            <option value="Lab Report" {{ old('type_of_service') == 'Lab Report' ? 'selected' : '' }}>Lab Report</option>
+                            <option value="Other" {{ old('type_of_service') == 'Other' ? 'selected' : '' }}>Other</option>
+                        </select>
+                        @error('type_of_service')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
-
-                    <div class="sm:col-span-3">
-                        <label for="type_of_service" class="block text-sm font-medium text-gray-700">Type of Service <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <select id="type_of_service" name="type_of_service" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md @error('type_of_service') border-red-300 @enderror" required>
-                                <option value="">Select service type</option>
-                                <option value="Essay" {{ old('type_of_service') == 'Essay' ? 'selected' : '' }}>Essay</option>
-                                <option value="Research Paper" {{ old('type_of_service') == 'Research Paper' ? 'selected' : '' }}>Research Paper</option>
-                                <option value="Assignment" {{ old('type_of_service') == 'Assignment' ? 'selected' : '' }}>Assignment</option>
-                                <option value="Programming" {{ old('type_of_service') == 'Programming' ? 'selected' : '' }}>Programming</option>
-                                <option value="Case Study" {{ old('type_of_service') == 'Case Study' ? 'selected' : '' }}>Case Study</option>
-                                <option value="Presentation" {{ old('type_of_service') == 'Presentation' ? 'selected' : '' }}>Presentation</option>
-                                <option value="Other" {{ old('type_of_service') == 'Other' ? 'selected' : '' }}>Other</option>
-                            </select>
-                            @error('type_of_service')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                    
+                    <!-- Academic Discipline -->
+                    <div class="mb-4">
+                        <label for="discipline" class="block text-sm font-medium text-gray-700 mb-1">Academic Discipline <span class="text-red-600">*</span></label>
+                        <select name="discipline" id="discipline" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('discipline') border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500 @enderror" required>
+                            <option value="">Select discipline</option>
+                            <option value="Business" {{ old('discipline') == 'Business' ? 'selected' : '' }}>Business</option>
+                            <option value="Mathematics" {{ old('discipline') == 'Mathematics' ? 'selected' : '' }}>Mathematics</option>
+                            <option value="Science" {{ old('discipline') == 'Science' ? 'selected' : '' }}>Science</option>
+                            <option value="History" {{ old('discipline') == 'History' ? 'selected' : '' }}>History</option>
+                            <option value="Technology" {{ old('discipline') == 'Technology' ? 'selected' : '' }}>Technology</option>
+                            <option value="Engineering" {{ old('discipline') == 'Engineering' ? 'selected' : '' }}>Engineering</option>
+                            <option value="Literature" {{ old('discipline') == 'Literature' ? 'selected' : '' }}>Literature</option>
+                            <option value="Art" {{ old('discipline') == 'Art' ? 'selected' : '' }}>Art</option>
+                            <option value="Law" {{ old('discipline') == 'Law' ? 'selected' : '' }}>Law</option>
+                            <option value="Psychology" {{ old('discipline') == 'Psychology' ? 'selected' : '' }}>Psychology</option>
+                            <option value="Sociology" {{ old('discipline') == 'Sociology' ? 'selected' : '' }}>Sociology</option>
+                            <option value="Economics" {{ old('discipline') == 'Economics' ? 'selected' : '' }}>Economics</option>
+                            <option value="Other" {{ old('discipline') == 'Other' ? 'selected' : '' }}>Other</option>
+                        </select>
+                        @error('discipline')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="task_size" class="block text-sm font-medium text-gray-700">Task Size/Pages <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <input type="number" name="task_size" id="task_size" min="1" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md @error('task_size') border-red-300 @enderror" value="{{ old('task_size', 1) }}" required>
-                            @error('task_size')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                    
+                    <!-- Task Size (Pages) -->
+                    <div class="mb-4">
+                        <label for="task_size" class="block text-sm font-medium text-gray-700 mb-1">Task Size (Pages) <span class="text-red-600">*</span></label>
+                        <input type="number" name="task_size" id="task_size" min="1" step="1" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('task_size') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" value="{{ old('task_size') }}" required>
+                        @error('task_size')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        <p class="mt-1 text-xs text-gray-500">Each page is approximately 275 words, double-spaced</p>
                     </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="price" class="block text-sm font-medium text-gray-700">Price (USD) <span class="text-red-500">*</span></label>
+                    
+                    <!-- Software Required (if any) -->
+                    <div class="mb-4">
+                        <label for="software" class="block text-sm font-medium text-gray-700 mb-1">Software Required (if any)</label>
+                        <input type="text" name="software" id="software" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" value="{{ old('software') }}">
+                        <p class="mt-1 text-xs text-gray-500">Specify any software needed (e.g., SPSS, Matlab, etc.)</p>
+                    </div>
+                </div>
+                
+                <!-- Order Timeline -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Timeline & Pricing</h4>
+                    
+                    <!-- Deadline -->
+                    <div class="mb-4">
+                        <label for="deadline" class="block text-sm font-medium text-gray-700 mb-1">Deadline <span class="text-red-600">*</span></label>
+                        <input type="datetime-local" name="deadline" id="deadline" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('deadline') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" value="{{ old('deadline') ?? date('Y-m-d\TH:i', strtotime('+3 days')) }}" required>
+                        @error('deadline')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    
+                    <!-- Price -->
+                    <div class="mb-4">
+                        <label for="price" class="block text-sm font-medium text-gray-700 mb-1">Price ($) <span class="text-red-600">*</span></label>
                         <div class="mt-1 relative rounded-md shadow-sm">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <span class="text-gray-500 sm:text-sm">$</span>
                             </div>
-                            <input type="number" name="price" id="price" step="0.01" min="1" class="focus:ring-primary-500 focus:border-primary-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md @error('price') border-red-300 @enderror" placeholder="0.00" value="{{ old('price') }}" required>
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">USD</span>
-                            </div>
+                            <input type="number" name="price" id="price" min="1" step="0.01" class="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('price') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" value="{{ old('price') }}" required>
                         </div>
                         @error('price')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="deadline" class="block text-sm font-medium text-gray-700">Deadline <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <input type="datetime-local" name="deadline" id="deadline" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md @error('deadline') border-red-300 @enderror" value="{{ old('deadline') }}" required>
-                            @error('deadline')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                </div>
+                
+                <!-- Client Information -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Client Information</h4>
+                    
+                    <!-- Client Name -->
+                    <div class="mb-4">
+                        <label for="client_name" class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+                        <input type="text" name="client_name" id="client_name" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" value="{{ old('client_name') }}">
                     </div>
-
-                    <div class="sm:col-span-6">
-                        <label for="instructions" class="block text-sm font-medium text-gray-700">Instructions <span class="text-red-500">*</span></label>
-                        <div class="mt-1">
-                            <textarea id="instructions" name="instructions" rows="6" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border border-gray-300 rounded-md @error('instructions') border-red-300 @enderror" required>{{ old('instructions') }}</textarea>
-                            @error('instructions')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <p class="mt-2 text-sm text-gray-500">Detailed instructions for the writer to complete the order.</p>
+                    
+                    <!-- Client Email -->
+                    <div class="mb-4">
+                        <label for="client_email" class="block text-sm font-medium text-gray-700 mb-1">Client Email</label>
+                        <input type="email" name="client_email" id="client_email" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('client_email') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" value="{{ old('client_email') }}">
+                        @error('client_email')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    
+                    <!-- Client Comments -->
+                    <div class="mb-4">
+                        <label for="customer_comments" class="block text-sm font-medium text-gray-700 mb-1">Client Comments</label>
+                        <textarea name="customer_comments" id="customer_comments" rows="3" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">{{ old('customer_comments') }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">Any specific client notes or requirements not covered in the instructions</p>
                     </div>
                 </div>
             </div>
-
-            <!-- File Upload Section -->
-            <div class="px-4 py-5 sm:p-6">
+            
+            <!-- Right Column -->
+            <div class="space-y-6">
+                <!-- Detailed Instructions -->
                 <div>
-                    <h3 class="text-lg font-medium leading-6 text-gray-900">Attachments</h3>
-                    <p class="mt-1 text-sm text-gray-500">Upload files required for this order (optional).</p>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Detailed Instructions</h4>
+                    
+                    <div class="mb-4">
+                        <label for="instructions" class="block text-sm font-medium text-gray-700 mb-1">Instructions <span class="text-red-600">*</span></label>
+                        <textarea name="instructions" id="instructions" rows="10" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('instructions') border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500 @enderror" required>{{ old('instructions') }}</textarea>
+                        @error('instructions')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        <p class="mt-1 text-xs text-gray-500">Provide detailed instructions for the order, including requirements, formatting, citation style, etc.</p>
+                    </div>
                 </div>
-
-                <div class="mt-4" x-data="{ files: [] }">
-                    <div class="flex items-center justify-center w-full">
-                        <label for="file-upload" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                
+                <!-- File Uploads -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">File Attachments</h4>
+                    
+                    <div class="mb-4">
+                        <label for="files" class="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
+                        
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                            <div class="space-y-1 text-center">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
-                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                                <p class="text-xs text-gray-500">PDF, DOCX, ZIP, etc. (Max 10MB per file)</p>
+                                <div class="flex text-sm text-gray-600 justify-center">
+                                    <label for="files" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                                        <span>Upload files</span>
+                                        <input id="files" name="files[]" type="file" class="sr-only" multiple>
+                                    </label>
+                                    <p class="pl-1">or drag and drop</p>
+                                </div>
+                                <p class="text-xs text-gray-500">
+                                    PDF, DOC, DOCX, XLS, XLSX, JPG, PNG up to 10MB each
+                                </p>
                             </div>
-                            <input id="file-upload" type="file" name="files[]" class="hidden" multiple @change="files = [...$event.target.files]" />
-                        </label>
-                    </div>
-                    
-                    <div class="mt-4" x-show="files.length > 0">
-                        <h4 class="text-sm font-medium text-gray-700">Selected Files:</h4>
-                        <ul class="mt-2 divide-y divide-gray-200 border border-gray-200 rounded-md">
-                            <template x-for="(file, index) in files" :key="index">
-                                <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                    <div class="w-0 flex-1 flex items-center">
-                                        <svg class="flex-shrink-0 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a3 3 0 006 0V7a1 1 0 112 0v4a5 5 0 01-10 0V7a5 5 0 0110 0v4a1 1 0 11-2 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span class="ml-2 flex-1 w-0 truncate" x-text="file.name"></span>
-                                    </div>
-                                    <div class="ml-4 flex-shrink-0 flex items-center space-x-4">
-                                        <span class="text-xs text-gray-500" x-text="(file.size / 1024).toFixed(2) + ' KB'"></span>
-                                        <button type="button" class="text-red-500 hover:text-red-700" @click="files = files.filter((_, i) => i !== index)">
-                                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </li>
-                            </template>
-                        </ul>
-                    </div>
-                    
-                    @error('files.*')
-                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-            </div>
-
-            <!-- Writer Assignment Section -->
-            <div class="px-4 py-5 sm:p-6">
-                <div>
-                    <h3 class="text-lg font-medium leading-6 text-gray-900">Writer Assignment</h3>
-                    <p class="mt-1 text-sm text-gray-500">Assign this order directly to a writer or make it available for bidding.</p>
-                </div>
-
-                <div class="mt-4">
-                    <div class="flex items-center mb-4">
-                        <input id="assignment_type_available" name="assignment_type" type="radio" class="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300" value="available" {{ old('assignment_type', 'available') == 'available' ? 'checked' : '' }}>
-                        <label for="assignment_type_available" class="ml-3 block text-sm font-medium text-gray-700">
-                            Make available for writers
-                        </label>
-                    </div>
-                    <div class="flex items-center">
-                        <input id="assignment_type_assign" name="assignment_type" type="radio" class="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300" value="assign" {{ old('assignment_type') == 'assign' ? 'checked' : '' }}>
-                        <label for="assignment_type_assign" class="ml-3 block text-sm font-medium text-gray-700">
-                            Assign to specific writer
-                        </label>
-                    </div>
-
-                    <div class="mt-4" x-data="{ showWriterSelect: {{ old('assignment_type') == 'assign' ? 'true' : 'false' }} }">
-                        <div x-show="showWriterSelect">
-                            <label for="writer_id" class="block text-sm font-medium text-gray-700">Select Writer</label>
-                            <select id="writer_id" name="writer_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md">
-                                <option value="">-- Select a writer --</option>
-                                @foreach($writers ?? [] as $writer)
-                                    <option value="{{ $writer->id }}" {{ old('writer_id') == $writer->id ? 'selected' : '' }}>
-                                        {{ $writer->name }} - {{ $writer->writerProfile->writer_id ?? 'No ID' }} (Rating: {{ number_format($writer->rating ?? 0, 1) }})
-                                    </option>
-                                @endforeach
-                            </select>
                         </div>
                         
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {
-                                const assignmentTypeAvailable = document.getElementById('assignment_type_available');
-                                const assignmentTypeAssign = document.getElementById('assignment_type_assign');
-                                
-                                assignmentTypeAvailable.addEventListener('change', function() {
-                                    if (this.checked) {
-                                        document.querySelector('[x-data]').__x.$data.showWriterSelect = false;
-                                    }
-                                });
-                                
-                                assignmentTypeAssign.addEventListener('change', function() {
-                                    if (this.checked) {
-                                        document.querySelector('[x-data]').__x.$data.showWriterSelect = true;
-                                    }
-                                });
-                            });
-                        </script>
+                        <div class="mt-2">
+                            <ul id="file-list" class="list-disc list-inside text-sm text-gray-600"></ul>
+                        </div>
+                        
+                        @error('files')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('files.*')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+                
+                <!-- Writer Assignment -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Writer Assignment</h4>
+                    
+                    <div class="mb-4">
+                        <label for="writer_id" class="block text-sm font-medium text-gray-700 mb-1">Assign to Writer (Optional)</label>
+                        <select name="writer_id" id="writer_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            <option value="">Leave unassigned (available for bidding)</option>
+                            @foreach($writers as $writer)
+                                <option value="{{ $writer->id }}" {{ old('writer_id') == $writer->id ? 'selected' : '' }}>
+                                    {{ $writer->name }} (Rating: {{ number_format($writer->rating ?? 0, 1) }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">If unassigned, the order will be visible to all qualified writers.</p>
+                    </div>
+                </div>
+                
+                <!-- Order Status -->
+                <div>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Order Status</h4>
+                    
+                    <div class="mb-4">
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Initial Status <span class="text-red-600">*</span></label>
+                        <select name="status" id="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm @error('status') border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500 @enderror" required>
+                            <option value="available" {{ old('status') == 'available' ? 'selected' : '' }}>Available (visible to writers)</option>
+                            <option value="hidden" {{ old('status') == 'hidden' || old('status') == '' ? 'selected' : '' }}>Hidden (draft mode)</option>
+                        </select>
+                        @error('status')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
             </div>
-
-            <!-- Form Actions -->
-            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
-                <a href="{{ route('admin.orders.index') }}" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                    Cancel
-                </a>
-                <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                    Create Order
-                </button>
-            </div>
-        </form>
-    </div>
-
-<script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
-
+        </div>
+        
+        <!-- Form Actions -->
+        <div class="pt-6 border-t border-gray-200 flex justify-end space-x-3">
+            <a href="{{ route('admin.orders.index') }}" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                Cancel
+            </a>
+            <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                Create Order
+            </button>
+        </div>
+    </form>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // File upload preview
+        const fileInput = document.getElementById('files');
+        const fileList = document.getElementById('file-list');
+        
+        fileInput.addEventListener('change', function(e) {
+            // Clear the list
+            fileList.innerHTML = '';
+            
+            // Add each file to the list
+            const files = e.target.files;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileSize = (file.size / 1024).toFixed(2); // Convert to KB
+                
+                const listItem = document.createElement('li');
+                listItem.className = 'mb-1';
+                listItem.textContent = `${file.name} (${fileSize} KB)`;
+                
+                fileList.appendChild(listItem);
+            }
+        });
+        
+        // Price calculation based on task size and deadline
+        const taskSizeInput = document.getElementById('task_size');
+        const deadlineInput = document.getElementById('deadline');
+        const priceInput = document.getElementById('price');
+        
+        // Only auto-calculate if price is empty or the user hasn't manually set it
+        let priceManuallySet = false;
+        
+        if (!priceInput.value) {
+            calculatePrice();
+        }
+        
+        taskSizeInput.addEventListener('input', function() {
+            if (!priceManuallySet) {
+                calculatePrice();
+            }
+        });
+        
+        deadlineInput.addEventListener('change', function() {
+            if (!priceManuallySet) {
+                calculatePrice();
+            }
+        });
+        
+        priceInput.addEventListener('input', function() {
+            priceManuallySet = true;
+        });
+        
+        function calculatePrice() {
+            const taskSize = parseInt(taskSizeInput.value) || 0;
+            const deadlineDate = new Date(deadlineInput.value);
+            const currentDate = new Date();
+            
+            const timeDiff = deadlineDate - currentDate;
+            const daysDiff = Math.max(1, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)));
+            
+            // Base price calculation
+            let basePrice = 20; // Base price per page
+            
+            // Urgency multiplier
+            let urgencyMultiplier = 1;
+            if (daysDiff < 1) {
+                urgencyMultiplier = 2.5; // Same day
+            } else if (daysDiff < 2) {
+                urgencyMultiplier = 2.0; // 1 day
+            } else if (daysDiff < 3) {
+                urgencyMultiplier = 1.5; // 2 days
+            } else if (daysDiff < 5) {
+                urgencyMultiplier = 1.3; // 3-4 days
+            } else if (daysDiff < 7) {
+                urgencyMultiplier = 1.1; // 5-6 days
+            }
+            
+            // Volume discount
+            let volumeDiscount = 1;
+            if (taskSize > 50) {
+                volumeDiscount = 0.8; // 20% discount
+            } else if (taskSize > 30) {
+                volumeDiscount = 0.85; // 15% discount
+            } else if (taskSize > 15) {
+                volumeDiscount = 0.9; // 10% discount
+            } else if (taskSize > 5) {
+                volumeDiscount = 0.95; // 5% discount
+            }
+            
+            const calculatedPrice = taskSize * basePrice * urgencyMultiplier * volumeDiscount;
+            
+            // Round to 2 decimal places
+            priceInput.value = calculatedPrice.toFixed(2);
+        }
+    });
+</script>
+@endpush

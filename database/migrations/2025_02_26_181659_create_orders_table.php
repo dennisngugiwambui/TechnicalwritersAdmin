@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('type_of_service');
             $table->string('discipline')->nullable();
             $table->string('software')->nullable();
-            $table->string('status')->default('available');
+            $table->string('status')->default('hidden');
             $table->foreignId('client_id')->constrained('users');
             $table->foreignId('writer_id')->nullable()->constrained('users');
             $table->text('customer_comments')->nullable();

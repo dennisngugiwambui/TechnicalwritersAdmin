@@ -90,6 +90,15 @@ class Order extends Model
             self::STATUS_FINISHED
         ]);
     }
+
+        /**
+     * Get the status logs for the order.
+     */
+    public function statusLogs()
+    {
+        return $this->hasMany(OrderStatusLog::class);
+    }
+
     
     // Check if order is completed or finished
     public function isCompleted()
@@ -202,6 +211,12 @@ public function statistics(Request $request)
         'endDate'
     ));
 }
+
+
+
+
+
+
 
 /**
  * Calculate writer's rating

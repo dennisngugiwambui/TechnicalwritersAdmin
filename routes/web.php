@@ -82,6 +82,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::get('/messages/{message}', [MessageController::class, 'show'])->name('messages.show');
     Route::post('/messages/{order}/send-as-client', [MessageController::class, 'sendAsClient'])->name('messages.send-as-client');
     Route::post('/messages/{order}/send-as-support', [MessageController::class, 'sendAsSupport'])->name('messages.send-as-support');
+    Route::post('/messages/reply/{conversationId}', [MessageController::class, 'reply'])->name('messages.reply');
     
     // Settings Management
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
