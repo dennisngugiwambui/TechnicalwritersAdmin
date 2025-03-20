@@ -894,4 +894,565 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const formData = new FormData(this);
             const submitButton = this.querySelector('button[type="submit"]');
-            const original
+            const originalButtonText = submitButton.innerHTML;
+            
+            // Disable button and show loading state
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sending...
+            `;
+            
+            fetch(this.action.replace('/reply/', '/ajax-reply/'), {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear the form
+                    messageForm.reset();
+                    document.getElementById('filePreviewContainer').classList.add('hidden');
+                    document.getElementById('filePreviewList').classList.add('hidden');
+                    
+                    // Add the new message to the thread
+                    addNewMessageToThread(data.message);
+                    
+                    // Update last checked time
+                    lastCheckedTime = new Date().toISOString();
+                    
+                    // Scroll to the bottom
+                    scrollToBottom();
+                    
+                    // Play sound effect
+                    playMessageSentSound();
+                } else {
+                    showNotification('error', data.message || 'An error occurred while sending your message.');
+                }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                showNotification('error', 'An error occurred while sending your message. Please try again.');
+            })
+            .finally(() => {
+                // Re-enable button and restore text
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            });
+        });
+    }
+    
+    // Function to add a new message to the thread
+    function addNewMessageToThread(message) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (!messagesContainer) return;
+        
+        const messageHtml = createMessageHTML(message);
+        messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
+        
+        // Scroll to the new message
+        scrollToBottom();
+    }
+    
+    // Scroll to bottom function
+    function scrollToBottom() {
+        const messageThread = document.getElementById('messageThread');
+        if (messageThread) {
+            messageThread.scrollTop = messageThread.scrollHeight;
+        }
+    }
+    
+    // Function to create HTML for a message
+    function createMessageHTML(message) {
+        const isSentByCurrentUser = message.user_id == {{ Auth::id() }};
+        const justifyClass = isSentByCurrentUser ? 'justify-end' : 'justify-start';
+        
+        let bgColorClass, textColorClass, borderClass, userInitial;
+        
+        if (isSentByCurrentUser) {
+            bgColorClass = 'bg-blue-600';
+            textColorClass = 'text-white';
+            borderClass = 'rounded-tl-2xl rounded-tr-sm rounded-br-2xl rounded-bl-2xl shadow-md';
+            userInitial = '{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}';
+        } else {
+            bgColorClass = 'bg-white';
+            textColorClass = 'text-gray-800';
+            borderClass = 'rounded-tr-2xl rounded-tl-sm rounded-bl-2xl rounded-br-2xl border border-gray-200 shadow-sm';
+            
+            if (message.message_type === 'client') {
+                userInitial = 'C';
+            } else if (message.message_type === 'writer') {
+                userInitial = 'W';
+            } else {
+                userInitial = 'A';
+            }
+        }
+        
+        const messageTime = formatMessageTime(message.created_at);
+        
+        let html = `
+            <div class="flex ${justifyClass} animate-fadeIn" id="message-${message.id}">
+        `;
+        
+        if (!isSentByCurrentUser) {
+            html += `
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-${message.message_type === 'client' ? 'blue' : (message.message_type === 'writer' ? 'green' : 'gray')}-100 flex items-center justify-center mr-2 self-end">
+                    <span class="text-${message.message_type === 'client' ? 'blue' : (message.message_type === 'writer' ? 'green' : 'gray')}-600 font-medium text-xs">
+                        ${userInitial}
+                    </span>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="${bgColorClass} ${textColorClass} ${borderClass} px-4 py-2 max-w-[85%] sm:max-w-[70%]">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-medium text-xs ${isSentByCurrentUser ? 'text-white' : 'text-gray-900'}">
+                        ${isSentByCurrentUser ? 'You' : message.user_name || 'Unknown'}
+                        ${message.message_type !== 'admin' ? `<span class="text-xs font-normal ${isSentByCurrentUser ? 'text-blue-100' : `text-${message.message_type === 'client' ? 'blue' : 'green'}-600`}">(as ${message.message_type === 'client' ? 'Client' : 'Writer'})</span>` : ''}
+                    </span>
+                    <span class="text-xs ${isSentByCurrentUser ? 'text-blue-100' : 'text-gray-500'}">
+                        ${messageTime}
+                    </span>
+                </div>
+        `;
+        
+        if (message.title) {
+            html += `<div class="font-medium text-sm mb-1 ${isSentByCurrentUser ? 'text-white' : 'text-gray-900'}">${message.title}</div>`;
+        }
+        
+        html += `<div class="text-sm whitespace-pre-wrap ${isSentByCurrentUser ? 'text-white' : 'text-gray-800'}">${message.message}</div>`;
+        
+        if (message.files && message.files.length > 0) {
+            html += `
+                <div class="mt-2 pt-2 border-t ${isSentByCurrentUser ? 'border-blue-500' : 'border-gray-200'}">
+            `;
+            
+            message.files.forEach(file => {
+                html += `
+                    <div class="flex items-center text-xs mt-1">
+                        <svg class="w-4 h-4 ${isSentByCurrentUser ? 'text-blue-100' : 'text-gray-500'} mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                        </svg>
+                        <a href="${file.download_url}" class="${isSentByCurrentUser ? 'text-blue-100' : 'text-primary-600'} hover:underline truncate max-w-[150px] sm:max-w-none">
+                            ${file.name}
+                        </a>
+                        <span class="ml-1 ${isSentByCurrentUser ? 'text-blue-100' : 'text-gray-500'} hidden sm:inline">(${formatFileSize(file.size)})</span>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+        }
+        
+        if (isSentByCurrentUser) {
+            html += `
+                <div class="text-right mt-1 flex justify-end">
+                    <span class="text-xs text-blue-100 flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Sent
+                    </span>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        
+        if (isSentByCurrentUser) {
+            html += `
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center ml-2 self-end">
+                    ${
+                        {{ Auth::user()->profile_picture ? true : false }}
+                        ? `<img class="h-8 w-8 rounded-full object-cover" src="{{ Auth::user()->profile_picture ? asset(Auth::user()->profile_picture) : '' }}" alt="{{ Auth::user()->name }}">`
+                        : `<span class="text-blue-600 font-medium text-xs">${userInitial}</span>`
+                    }
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        
+        return html;
+    }
+    
+    // Function to format file size
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        const kb = bytes / 1024;
+        if (kb < 1024) return kb.toFixed(1) + ' KB';
+        const mb = kb / 1024;
+        return mb.toFixed(1) + ' MB';
+    }
+    
+    // Function to play notification sound
+    function playNotificationSound() {
+        try {
+            const audio = new Audio('/sounds/notification.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio play prevented:', e));
+        } catch (e) {
+            console.log('Notification sound error:', e);
+        }
+    }
+    
+    // Play message sent sound
+    function playMessageSentSound() {
+        try {
+            const audio = new Audio('/sounds/message-sent.mp3');
+            audio.volume = 0.3;
+            audio.play().catch(e => console.log('Audio play prevented:', e));
+        } catch (e) {
+            console.log('Message sent sound error:', e);
+        }
+    }
+    
+    // Show notification toast
+    function showNotification(type, message) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'fixed top-4 right-4 z-50 flex flex-col space-y-2';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast
+        const toast = document.createElement('div');
+        toast.className = `transform transition-all duration-300 ease-in-out max-w-xs ${type === 'error' ? 'bg-red-50 border-l-4 border-red-500' : 'bg-green-50 border-l-4 border-green-500'} p-4 rounded shadow-lg flex items-start`;
+        
+        // Toast content
+        toast.innerHTML = `
+            <div class="${type === 'error' ? 'text-red-500' : 'text-green-500'} mr-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    ${type === 'error' 
+                        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
+                        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'}
+                </svg>
+            </div>
+            <div>
+                <p class="font-medium ${type === 'error' ? 'text-red-800' : 'text-green-800'}">${type === 'error' ? 'Error' : 'Success'}!</p>
+                <p class="text-sm ${type === 'error' ? 'text-red-700' : 'text-green-700'} mt-1">${message}</p>
+            </div>
+            <button class="ml-auto ${type === 'error' ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        `;
+        
+        // Add toast to container
+        toastContainer.appendChild(toast);
+        
+        // Add click listener to close button
+        toast.querySelector('button').addEventListener('click', function() {
+            toast.classList.add('opacity-0', 'translate-x-full');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        });
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-full');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, 5000);
+    }
+    
+    // Real-time message updates via AJAX
+    let lastCheckedTime = new Date().toISOString();
+    let currentConversationId = null;
+    
+    // Get the current conversation ID if available
+    const conversationParam = new URLSearchParams(window.location.search).get('conversation');
+    if (conversationParam) {
+        currentConversationId = conversationParam;
+        
+        // Begin periodic checking for new messages
+        setInterval(checkForNewMessages, 8000); // Check every 8 seconds
+    }
+    
+    // Function to check for new messages
+    function checkForNewMessages() {
+        if (!currentConversationId) return;
+        
+        fetch(`{{ route('admin.messages.check') }}?conversation=${currentConversationId}&after=${encodeURIComponent(lastCheckedTime)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.messages.length > 0) {
+                // Check if we need to add a date separator
+                const lastMessage = document.querySelector('#messagesContainer > div:last-child');
+                let lastMessageDate = null;
+                
+                if (lastMessage) {
+                    const lastMessageTimestamp = lastMessage.querySelector('.text-gray-500, .text-blue-100')?.textContent;
+                    if (lastMessageTimestamp) {
+                        if (lastMessageTimestamp.includes('Today')) {
+                            lastMessageDate = 'today';
+                        } else if (lastMessageTimestamp.includes('Yesterday')) {
+                            lastMessageDate = 'yesterday';
+                        } else {
+                            // It's a full date
+                            lastMessageDate = lastMessageTimestamp.split(' ')[0];
+                        }
+                    }
+                }
+                
+                // Add new messages to the thread
+                data.messages.forEach(message => {
+                    // Check if the message already exists in the thread
+                    if (!document.getElementById(`message-${message.id}`)) {
+                        // Check if we need a new date separator
+                        const messageDate = new Date(message.created_at);
+                        const today = new Date();
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        
+                        let currentMessageDate;
+                        if (messageDate.toDateString() === today.toDateString()) {
+                            currentMessageDate = 'today';
+                        } else if (messageDate.toDateString() === yesterday.toDateString()) {
+                            currentMessageDate = 'yesterday';
+                        } else {
+                            currentMessageDate = messageDate.toLocaleDateString();
+                        }
+                        
+                        // If the date is different, add a separator
+                        if (lastMessageDate !== currentMessageDate) {
+                            const dateSeparator = `
+                                <div class="flex items-center justify-center my-4">
+                                    <div class="bg-gray-200 px-3 py-1 rounded-full shadow-sm">
+                                        <span class="text-xs text-gray-600">
+                                            ${currentMessageDate === 'today' ? 'Today' : 
+                                              currentMessageDate === 'yesterday' ? 'Yesterday' : 
+                                              new Date(message.created_at).toLocaleDateString([], {month: 'long', day: 'numeric', year: 'numeric'})}
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                            document.getElementById('messagesContainer').insertAdjacentHTML('beforeend', dateSeparator);
+                            lastMessageDate = currentMessageDate;
+                        }
+                        
+                        addNewMessageToThread(message);
+                        
+                        // Update conversation list with most recent message
+                        updateConversationListItem(message);
+                    }
+                });
+                
+                // Play notification sound for new messages
+                playNotificationSound();
+                
+                // Update last checked time
+                lastCheckedTime = new Date().toISOString();
+            }
+        })
+        .catch(error => console.error('Error checking for new messages:', error));
+    }
+    
+    // Update conversation list with the most recent message
+    function updateConversationListItem(message) {
+        const conversationList = document.getElementById('conversationsList');
+        if (!conversationList) return;
+        
+        const conversationItems = conversationList.querySelectorAll('.conversation-item');
+        let conversationItem = null;
+        
+        // Find the relevant conversation item
+        conversationItems.forEach(item => {
+            if (item.querySelector(`a[data-conversation-id="${currentConversationId}"]`)) {
+                conversationItem = item;
+            }
+        });
+        
+        if (conversationItem) {
+            // Update the last message text
+            const lastMessageElement = conversationItem.querySelector('.text-gray-500.font-normal, .text-gray-900.font-medium');
+            if (lastMessageElement) {
+                lastMessageElement.textContent = Str.limit(message.message, 35);
+            }
+            
+            // Update the timestamp
+            const timestampElement = conversationItem.querySelector('.whitespace-nowrap');
+            if (timestampElement) {
+                timestampElement.textContent = formatMessageTime(message.created_at);
+            }
+            
+            // Move this conversation to the top
+            if (conversationList.firstChild !== conversationItem) {
+                conversationList.insertBefore(conversationItem, conversationList.firstChild);
+            }
+        }
+    }
+    
+    // Filter messages based on type
+    function filterMessages(type) {
+        const conversationItems = document.querySelectorAll('.conversation-item');
+        const allButton = document.querySelector('button[onclick="filterMessages(\'all\')"]');
+        const unreadButton = document.querySelector('button[onclick="filterMessages(\'unread\')"]');
+        const ordersButton = document.querySelector('button[onclick="filterMessages(\'orders\')"]');
+        
+        // Update active button styling
+        allButton.classList.remove('border-b-2', 'border-primary-500', 'text-primary-600');
+        unreadButton.classList.remove('border-b-2', 'border-primary-500', 'text-primary-600');
+        ordersButton.classList.remove('border-b-2', 'border-primary-500', 'text-primary-600');
+        
+        allButton.classList.add('text-gray-500', 'hover:text-gray-700');
+        unreadButton.classList.add('text-gray-500', 'hover:text-gray-700');
+        ordersButton.classList.add('text-gray-500', 'hover:text-gray-700');
+        
+        // Set active button
+        if (type === 'all') {
+            allButton.classList.add('border-b-2', 'border-primary-500', 'text-primary-600');
+            allButton.classList.remove('text-gray-500', 'hover:text-gray-700');
+        } else if (type === 'unread') {
+            unreadButton.classList.add('border-b-2', 'border-primary-500', 'text-primary-600');
+            unreadButton.classList.remove('text-gray-500', 'hover:text-gray-700');
+        } else if (type === 'orders') {
+            ordersButton.classList.add('border-b-2', 'border-primary-500', 'text-primary-600');
+            ordersButton.classList.remove('text-gray-500', 'hover:text-gray-700');
+        }
+        
+        // Filter items with animation
+        conversationItems.forEach(item => {
+            if (type === 'all') {
+                item.style.opacity = '0';
+                item.style.display = '';
+                setTimeout(() => {
+                    item.style.opacity = '1';
+                }, 50);
+            } else if (type === 'unread') {
+                if (item.dataset.unread === 'true') {
+                    item.style.opacity = '0';
+                    item.style.display = '';
+                    setTimeout(() => {
+                        item.style.opacity = '1';
+                    }, 50);
+                } else {
+                    item.style.opacity = '1';
+                    setTimeout(() => {
+                        item.style.display = 'none';
+                    }, 200);
+                }
+            } else if (type === 'orders') {
+                if (item.dataset.hasOrder === 'true') {
+                    item.style.opacity = '0';
+                    item.style.display = '';
+                    setTimeout(() => {
+                        item.style.opacity = '1';
+                    }, 50);
+                } else {
+                    item.style.opacity = '1';
+                    setTimeout(() => {
+                        item.style.display = 'none';
+                    }, 200);
+                }
+            }
+        });
+    }
+    
+    // Enhanced search functionality
+    const searchInput = document.getElementById('searchConversations');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            const conversationItems = document.querySelectorAll('.conversation-item');
+            
+            conversationItems.forEach(item => {
+                // Get data attributes for searching
+                const writerName = (item.dataset.name || '').toLowerCase();
+                const writerId = (item.dataset.id || '').toLowerCase();
+                const orderId = (item.dataset.order || '').toLowerCase();
+                
+                // Get text content for deeper search
+                const textContent = item.textContent.toLowerCase();
+                
+                // Check if the search term is an order number (with or without #)
+                const isOrderSearch = searchTerm.startsWith('#') || /^\d+$/.test(searchTerm);
+                const orderSearchTerm = searchTerm.replace('#', '');
+                
+                // Search name, writer ID, order ID or general content
+                if (searchTerm === '') {
+                    // Show all when search is empty
+                    item.style.display = '';
+                    item.style.opacity = '1';
+                } else if (
+                    writerName.includes(searchTerm) || 
+                    writerId.includes(searchTerm) || 
+                    orderId.includes(searchTerm) || 
+                    textContent.includes(searchTerm) ||
+                    (isOrderSearch && orderId.includes(orderSearchTerm))
+                ) {
+                    // Show matching items with animation
+                    item.style.display = '';
+                    setTimeout(() => {
+                        item.style.opacity = '1';
+                    }, 50);
+                } else {
+                    // Hide non-matching items with animation
+                    item.style.opacity = '0';
+                    setTimeout(() => {
+                        item.style.display = 'none';
+                    }, 200);
+                }
+            });
+        });
+    }
+});
+
+// String limit helper function
+const Str = {
+    limit: function(string, length) {
+        if (!string) return '';
+        if (string.length <= length) return string;
+        return string.substring(0, length) + '...';
+    }
+};
+
+@php
+/**
+ * Format message timestamp for display
+ *
+ * @param \Carbon\Carbon|string $date
+ * @return string
+ */
+function formatMessageTime($date)
+{
+    if (!$date) return '';
+    
+    if (is_string($date)) {
+        $date = \Carbon\Carbon::parse($date);
+    }
+    
+    $now = \Carbon\Carbon::now();
+    
+    if ($date->isToday()) {
+        return $date->format('g:i A');
+    } elseif ($date->isYesterday()) {
+        return 'Yesterday ' . $date->format('g:i A');
+    } elseif ($date->year === $now->year) {
+        return $date->format('M j, g:i A');
+    } else {
+        return $date->format('M j, Y, g:i A');
+    }
+}
+@endphp
+</script>
+@endpush
