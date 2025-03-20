@@ -207,6 +207,7 @@ class MessageController extends Controller
             ->with('success', 'Message sent successfully');
     }
 
+   
     /**
      * Reply to a conversation.
      *
@@ -277,6 +278,158 @@ class MessageController extends Controller
             ->get();
 
         return response()->json($recipients);
+    }
+
+    /**
+     * Check for new messages in a conversation.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkNewMessages(Request $request)
+    {
+        // Validate the request
+        $request->validate([
+            'conversation' => 'required|string',
+            'after' => 'required|date'
+        ]);
+
+        // Parse conversation ID to get participant and order
+        list($participantId, $orderId) = $this->parseConversationId($request->conversation);
+        
+        // Query for new messages
+        $query = Message::query();
+        
+        // Filter by time
+        $query->where('created_at', '>', $request->after);
+        
+        // Filter by order if specified
+        if ($orderId) {
+            $query->where('order_id', $orderId);
+        }
+        
+        // Filter by participant
+        $query->where(function($q) use ($participantId) {
+            $q->where(function($subq) use ($participantId) {
+                $subq->where('user_id', $participantId)
+                    ->where(function($innerq) {
+                        $innerq->where('receiver_id', Auth::id())
+                            ->orWhere('is_general', true);
+                    });
+            });
+        });
+        
+        // Get messages with relationships
+        $messages = $query->with(['user', 'files'])
+                        ->orderBy('created_at', 'asc')
+                        ->get();
+        
+        // Format messages for JSON response
+        $formattedMessages = $messages->map(function($message) {
+            return [
+                'id' => $message->id,
+                'user_id' => $message->user_id,
+                'user_name' => $message->user->name ?? 'Unknown',
+                'message_type' => $message->message_type,
+                'title' => $message->title,
+                'message' => $message->message,
+                'created_at' => $message->created_at,
+                'files' => $message->files->map(function($file) {
+                    return [
+                        'id' => $file->id,
+                        'name' => $file->name,
+                        'size' => $file->size,
+                        'download_url' => route('files.download', $file->id)
+                    ];
+                })
+            ];
+        });
+        
+        // Mark messages as read
+        if ($messages->count() > 0) {
+            $messageIds = $messages->pluck('id')->toArray();
+            Message::whereIn('id', $messageIds)
+                ->where('receiver_id', Auth::id())
+                ->whereNull('read_at')
+                ->update(['read_at' => Carbon::now()]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'messages' => $formattedMessages
+        ]);
+    }
+
+        /**
+     * Reply to a conversation via AJAX.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $conversationId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxReply(Request $request, $conversationId)
+    {
+        // Validate the request
+        $validated = $request->validate([
+            'message' => 'required|string',
+            'message_type' => 'nullable|string|in:admin,client',
+            'files.*' => 'nullable|file|max:10240', // Max 10MB per file
+        ]);
+
+        // Parse conversation ID to get participant and order
+        list($participantId, $orderId) = $this->parseConversationId($conversationId);
+
+        // Create the message
+        $message = Message::create([
+            'user_id' => Auth::id(),
+            'receiver_id' => $participantId,
+            'order_id' => $orderId,
+            'message' => $validated['message'],
+            'message_type' => $validated['message_type'] ?? 'admin',
+            'is_general' => false,
+        ]);
+
+        // Handle file uploads
+        $files = [];
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $originalName = $file->getClientOriginalName();
+                $uniqueName = pathinfo($originalName, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $path = $file->storeAs('message_files', $uniqueName);
+                
+                $fileModel = File::create([
+                    'name' => $originalName,
+                    'path' => $path,
+                    'size' => $file->getSize(),
+                    'fileable_id' => $message->id,
+                    'fileable_type' => Message::class,
+                    'uploaded_by' => Auth::id()
+                ]);
+                
+                $files[] = [
+                    'id' => $fileModel->id,
+                    'name' => $fileModel->name,
+                    'size' => $fileModel->size,
+                    'download_url' => route('files.download', $fileModel->id)
+                ];
+            }
+        }
+
+        // Format the message for JSON response
+        $formattedMessage = [
+            'id' => $message->id,
+            'user_id' => $message->user_id,
+            'user_name' => Auth::user()->name,
+            'message_type' => $message->message_type,
+            'message' => $message->message,
+            'created_at' => $message->created_at,
+            'files' => $files
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => $formattedMessage
+        ]);
     }
 
     /**

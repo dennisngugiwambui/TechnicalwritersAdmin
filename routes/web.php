@@ -9,6 +9,10 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\MessageController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\AdminHomeController;
+use App\Http\Controllers\Admin\MpesaController;
+use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\FileController;
+
 // Public routes
 Route::get('/', function () {
     return redirect()->route('login');
@@ -68,12 +72,46 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/writers/{writer}/verify', [WriterController::class, 'verify'])->name('writers.verify');
     Route::post('/writers/{writer}/reject', [WriterController::class, 'reject'])->name('writers.reject');
     
-    // Payments Management
+    // Payment Management (Legacy routes)
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::post('/payments/{payment}/process-mpesa', [PaymentController::class, 'processMpesa'])->name('payments.process-mpesa');
+    
+    // Finance Management (New routes)
+    Route::prefix('finance')->name('finance.')->group(function () {
+        // Dashboard
+        Route::get('/dashboard', [PaymentController::class, 'dashboard'])->name('dashboard');
+        
+        // Transactions
+        Route::get('/transactions', [PaymentController::class, 'index'])->name('transactions');
+        Route::get('/transaction/{id}', [PaymentController::class, 'show'])->name('transaction');
+        
+        // Payments
+        Route::get('/payments', [PaymentController::class, 'payments'])->name('payments');
+        
+        // Withdrawals
+        Route::get('/withdrawals', [PaymentController::class, 'withdrawals'])->name('withdrawals');
+        Route::put('/withdraw/{id}/approve', [PaymentController::class, 'approveWithdrawal'])->name('approve');
+        Route::put('/withdraw/{id}/complete', [PaymentController::class, 'completeWithdrawal'])->name('complete');
+        Route::put('/withdraw/{id}/reject', [PaymentController::class, 'rejectWithdrawal'])->name('reject');
+        
+        // Reports
+        Route::get('/reports', [PaymentController::class, 'reports'])->name('reports');
+        Route::get('/chart-data', [PaymentController::class, 'getChartData'])->name('chart-data');
+        
+        // Bonuses
+        Route::get('/bonus/create', [PaymentController::class, 'createBonus'])->name('bonus.create');
+        Route::post('/bonus', [PaymentController::class, 'storeBonus'])->name('bonus.store');
+        
+        // Penalties
+        Route::get('/penalty/create', [PaymentController::class, 'createPenalty'])->name('penalty.create');
+        Route::post('/penalty', [PaymentController::class, 'storePenalty'])->name('penalty.store');
+        
+        // Refunds
+        Route::post('/transaction/{id}/refund', [PaymentController::class, 'processRefund'])->name('refund');
+    });
     
     // Messages Management
     Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
@@ -83,6 +121,9 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/messages/{order}/send-as-client', [MessageController::class, 'sendAsClient'])->name('messages.send-as-client');
     Route::post('/messages/{order}/send-as-support', [MessageController::class, 'sendAsSupport'])->name('messages.send-as-support');
     Route::post('/messages/reply/{conversationId}', [MessageController::class, 'reply'])->name('messages.reply');
+    Route::get('/messages/recipients/{type}', [MessageController::class, 'recipients'])->name('messages.recipients');
+    Route::get('/messages/check', [MessageController::class, 'checkNewMessages'])->name('messages.check');
+    Route::post('/messages/ajax-reply/{conversationId}', [MessageController::class, 'ajaxReply'])->name('messages.ajax-reply');
     
     // Settings Management
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
@@ -97,16 +138,22 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
 });
 
 // Order files download route
-Route::get('/files/{file}/download', [App\Http\Controllers\FileController::class, 'download'])
+Route::get('/files/{file}/download', [FileController::class, 'download'])
     ->name('files.download')
     ->middleware('auth');
 
+// M-Pesa client-facing routes
+Route::middleware(['auth'])->group(function () {
+    Route::post('/payment/mpesa', [PaymentController::class, 'initiatePayment'])->name('payment.mpesa.initiate');
+    Route::get('/payment/mpesa/status', [PaymentController::class, 'checkPaymentStatus'])->name('payment.mpesa.status');
+});
+
 // M-Pesa callback routes
-Route::post('/api/mpesa/callback', [App\Http\Controllers\Admin\MpesaController::class, 'callback'])
-    ->name('mpesa.callback');
+Route::post('/api/mpesa/stk/callback', [MpesaController::class, 'stkCallback'])->name('api.mpesa.stk.callback');
+Route::post('/api/mpesa/b2c/result', [MpesaController::class, 'b2cResultCallback'])->name('api.mpesa.b2c.result');
+Route::post('/api/mpesa/b2c/timeout', [MpesaController::class, 'b2cTimeoutCallback'])->name('api.mpesa.b2c.timeout');
 
-Route::post('/api/mpesa/timeout', [App\Http\Controllers\Admin\MpesaController::class, 'timeout'])
-    ->name('mpesa.timeout');
-
-Route::post('/api/mpesa/result', [App\Http\Controllers\Admin\MpesaController::class, 'result'])
-    ->name('mpesa.result');
+// Legacy M-Pesa routes (keeping for backward compatibility)
+Route::post('/api/mpesa/callback', [MpesaController::class, 'callback'])->name('mpesa.callback');
+Route::post('/api/mpesa/timeout', [MpesaController::class, 'timeout'])->name('mpesa.timeout');
+Route::post('/api/mpesa/result', [MpesaController::class, 'result'])->name('mpesa.result');

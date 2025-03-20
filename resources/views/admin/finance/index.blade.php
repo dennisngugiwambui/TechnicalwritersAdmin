@@ -21,7 +21,7 @@
                         <dl>
                             <dt class="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
                             <dd class="flex items-baseline">
-                                <div class="text-xl font-semibold text-gray-900">${{ number_format($totalRevenue, 2) }}</div>
+                                <div class="text-xl font-semibold text-gray-900">$</div>
                                 <div class="ml-2 flex items-baseline text-sm font-semibold {{ $revenueChange >= 0 ? 'text-green-600' : 'text-red-600' }}">
                                     <svg class="self-center flex-shrink-0 h-4 w-4 {{ $revenueChange >= 0 ? 'text-green-500' : 'text-red-500' }}" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                                         <path fill-rule="evenodd" d="M{{ $revenueChange >= 0 ? '10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z' : '10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z' }}" clip-rule="evenodd" />

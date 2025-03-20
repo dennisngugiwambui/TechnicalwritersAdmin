@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use App\Notifications\WithdrawalProcessed;
+use App\Notifications\WithdrawalFailed;
 use App\Notifications\BonusReceived;
 use App\Notifications\PenaltyApplied;
 use App\Services\MpesaDarajaService;
@@ -27,8 +28,259 @@ class PaymentController extends Controller
      */
     public function __construct(MpesaDarajaService $mpesaService)
     {
-        $this->middleware('auth:admin');
+        $this->middleware('auth');
         $this->mpesaService = $mpesaService;
+    }
+    
+    /**
+     * Display the finance dashboard.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function dashboard()
+    {
+        // Current month and previous month dates
+        $currentMonth = Carbon::now()->startOfMonth();
+        $previousMonth = Carbon::now()->subMonth()->startOfMonth();
+        
+        // Calculate total revenue (current month)
+        $totalRevenue = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', $currentMonth->month)
+            ->whereYear('created_at', $currentMonth->year)
+            ->sum('amount');
+        
+        // Calculate total revenue (previous month)
+        $previousRevenue = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', $previousMonth->month)
+            ->whereYear('created_at', $previousMonth->year)
+            ->sum('amount');
+        
+        // Calculate revenue change percentage
+        $revenueChange = $previousRevenue > 0 
+            ? round((($totalRevenue - $previousRevenue) / $previousRevenue) * 100, 1) 
+            : 0;
+        
+        // Calculate writer payments (current month)
+        $writerPayments = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_BONUS
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', $currentMonth->month)
+            ->whereYear('created_at', $currentMonth->year)
+            ->sum('amount');
+        
+        // Calculate pending payments
+        $pendingPayments = Finance::where('transaction_type', Finance::TYPE_WITHDRAWAL)
+            ->whereIn('status', [
+                Finance::STATUS_PENDING,
+                Finance::STATUS_PROCESSING
+            ])
+            ->sum('amount');
+        
+        // Calculate profit margin
+        $profitMargin = $totalRevenue > 0 
+            ? round((($totalRevenue - $writerPayments) / $totalRevenue) * 100, 1) 
+            : 0;
+        
+        // Calculate previous month's profit margin
+        $previousWriterPayments = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_BONUS
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', $previousMonth->month)
+            ->whereYear('created_at', $previousMonth->year)
+            ->sum('amount');
+        
+        $previousProfitMargin = $previousRevenue > 0 
+            ? round((($previousRevenue - $previousWriterPayments) / $previousRevenue) * 100, 1) 
+            : 0;
+        
+        $marginChange = round($profitMargin - $previousProfitMargin, 1);
+        
+        // Get recent transactions
+        $recentTransactions = Finance::with(['user', 'order'])
+            ->latest()
+            ->limit(10)
+            ->get();
+        
+        // Generate chart data for the last 30 days
+        $endDate = Carbon::now();
+        $startDate = Carbon::now()->subDays(29);
+        $dates = [];
+        $revenueData = [];
+        $paymentData = [];
+        
+        for ($date = $startDate->copy(); $date <= $endDate; $date->addDay()) {
+            $dates[] = $date->format('M d');
+            
+            // Daily revenue
+            $dailyRevenue = Finance::whereIn('transaction_type', [
+                    Finance::TYPE_ORDER_PAYMENT
+                ])
+                ->where('status', Finance::STATUS_COMPLETED)
+                ->whereDate('created_at', $date->format('Y-m-d'))
+                ->sum('amount');
+            
+            $revenueData[] = $dailyRevenue;
+            
+            // Daily writer payments
+            $dailyPayments = Finance::whereIn('transaction_type', [
+                    Finance::TYPE_ORDER_PAYMENT,
+                    Finance::TYPE_BONUS
+                ])
+                ->where('status', Finance::STATUS_COMPLETED)
+                ->whereDate('created_at', $date->format('Y-m-d'))
+                ->sum('amount');
+            
+            $paymentData[] = $dailyPayments;
+        }
+        
+        $chartLabels = $dates;
+        
+        return view('admin.finance.dashboard', compact(
+            'totalRevenue',
+            'revenueChange',
+            'writerPayments',
+            'pendingPayments',
+            'profitMargin',
+            'marginChange',
+            'recentTransactions',
+            'chartLabels',
+            'revenueData',
+            'paymentData'
+        ));
+    }
+    
+    /**
+     * Get chart data for AJAX request.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getChartData(Request $request)
+    {
+        $period = $request->get('period', 30);
+        $endDate = Carbon::now();
+        $startDate = Carbon::now()->subDays($period - 1);
+        
+        $dates = [];
+        $revenueData = [];
+        $paymentData = [];
+        
+        // Adjust interval based on period
+        $interval = 'day';
+        $dateFormat = 'M d';
+        
+        if ($period > 90) {
+            $interval = 'week';
+            $dateFormat = 'M d';
+        }
+        
+        if ($period > 180) {
+            $interval = 'month';
+            $dateFormat = 'M Y';
+        }
+        
+        if ($interval === 'day') {
+            for ($date = $startDate->copy(); $date <= $endDate; $date->addDay()) {
+                $dates[] = $date->format($dateFormat);
+                
+                // Daily revenue
+                $dailyRevenue = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereDate('created_at', $date->format('Y-m-d'))
+                    ->sum('amount');
+                
+                $revenueData[] = $dailyRevenue;
+                
+                // Daily writer payments
+                $dailyPayments = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT,
+                        Finance::TYPE_BONUS
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereDate('created_at', $date->format('Y-m-d'))
+                    ->sum('amount');
+                
+                $paymentData[] = $dailyPayments;
+            }
+        } elseif ($interval === 'week') {
+            $currentDate = $startDate->copy()->startOfWeek();
+            while ($currentDate <= $endDate) {
+                $weekEnd = $currentDate->copy()->endOfWeek();
+                $dates[] = $currentDate->format('M d') . ' - ' . $weekEnd->format('M d');
+                
+                // Weekly revenue
+                $weeklyRevenue = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereBetween('created_at', [$currentDate, $weekEnd])
+                    ->sum('amount');
+                
+                $revenueData[] = $weeklyRevenue;
+                
+                // Weekly writer payments
+                $weeklyPayments = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT,
+                        Finance::TYPE_BONUS
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereBetween('created_at', [$currentDate, $weekEnd])
+                    ->sum('amount');
+                
+                $paymentData[] = $weeklyPayments;
+                
+                $currentDate->addWeek();
+            }
+        } else {
+            $currentDate = $startDate->copy()->startOfMonth();
+            while ($currentDate <= $endDate) {
+                $monthEnd = $currentDate->copy()->endOfMonth();
+                $dates[] = $currentDate->format($dateFormat);
+                
+                // Monthly revenue
+                $monthlyRevenue = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereMonth('created_at', $currentDate->month)
+                    ->whereYear('created_at', $currentDate->year)
+                    ->sum('amount');
+                
+                $revenueData[] = $monthlyRevenue;
+                
+                // Monthly writer payments
+                $monthlyPayments = Finance::whereIn('transaction_type', [
+                        Finance::TYPE_ORDER_PAYMENT,
+                        Finance::TYPE_BONUS
+                    ])
+                    ->where('status', Finance::STATUS_COMPLETED)
+                    ->whereMonth('created_at', $currentDate->month)
+                    ->whereYear('created_at', $currentDate->year)
+                    ->sum('amount');
+                
+                $paymentData[] = $monthlyPayments;
+                
+                $currentDate->addMonth();
+            }
+        }
+        
+        return response()->json([
+            'labels' => $dates,
+            'revenue' => $revenueData,
+            'payments' => $paymentData
+        ]);
     }
     
     /**
@@ -64,7 +316,7 @@ class PaymentController extends Controller
         $transactions = $query->latest()->paginate(15);
         
         // Get transaction statistics
-        $transactionCount = $query->count();
+        $transactionCount = Finance::count();
         
         // Calculate total amounts
         $totalIncome = Finance::whereIn('transaction_type', [
@@ -85,11 +337,157 @@ class PaymentController extends Controller
         $totalAmount = $totalIncome + $totalOutgoing;
         $netBalance = $totalIncome - $totalOutgoing;
         
+        // Variables needed for the view based on your blade file
+        $totalRevenue = $totalIncome; // Ensuring this is passed to the view
+        $revenueChange = 0; // You can calculate this if needed
+        $writerPayments = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_BONUS
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', Carbon::now()->month)
+            ->whereYear('created_at', Carbon::now()->year)
+            ->sum('amount');
+        $pendingPayments = Finance::where('transaction_type', Finance::TYPE_WITHDRAWAL)
+            ->whereIn('status', [Finance::STATUS_PENDING, Finance::STATUS_PROCESSING])
+            ->sum('amount');
+        $profitMargin = $totalRevenue > 0 ? round((($totalRevenue - $writerPayments) / $totalRevenue) * 100, 1) : 0;
+        $marginChange = 0; // You can calculate this if needed
+        $recentTransactions = Finance::latest()->limit(10)->get();
+        
+        // For chart data
+        $chartLabels = [];
+        $revenueData = [];
+        $paymentData = [];
+        
         return view('admin.finance.index', compact(
             'transactions', 
             'transactionCount', 
             'totalAmount', 
-            'netBalance'
+            'netBalance',
+            'totalRevenue',
+            'revenueChange',
+            'writerPayments',
+            'pendingPayments',
+            'profitMargin',
+            'marginChange',
+            'recentTransactions',
+            'chartLabels',
+            'revenueData',
+            'paymentData'
+        ));
+    }
+    
+    /**
+     * Display a listing of payments (filtered by type, status, etc.)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function payments(Request $request)
+    {
+        $query = Finance::with(['user', 'order', 'processor']);
+        
+        // Filter by payment types only
+        $query->whereIn('transaction_type', [
+            Finance::TYPE_ORDER_PAYMENT,
+            Finance::TYPE_WITHDRAWAL,
+            Finance::TYPE_REFUND
+        ]);
+        
+        // Filter by status
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+        
+        // Filter by date range
+        if ($request->has('date_from') && $request->date_from) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        
+        if ($request->has('date_to') && $request->date_to) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        
+        // Get payments with pagination
+        $payments = $query->latest()->paginate(15);
+        
+        // Get payment statistics
+        $pendingCount = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_WITHDRAWAL,
+                Finance::TYPE_REFUND
+            ])
+            ->where('status', Finance::STATUS_PENDING)
+            ->count();
+            
+        $pendingAmount = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_WITHDRAWAL,
+                Finance::TYPE_REFUND
+            ])
+            ->where('status', Finance::STATUS_PENDING)
+            ->sum('amount');
+        
+        $completedToday = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_WITHDRAWAL,
+                Finance::TYPE_REFUND
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereDate('processed_at', Carbon::today())
+            ->count();
+        
+        $completedAmountToday = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_WITHDRAWAL,
+                Finance::TYPE_REFUND
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereDate('processed_at', Carbon::today())
+            ->sum('amount');
+        
+        // Additional variables that might be needed based on the view
+        $totalRevenue = Finance::whereIn('transaction_type', [Finance::TYPE_ORDER_PAYMENT])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->sum('amount');
+        $revenueChange = 0;
+        $writerPayments = Finance::whereIn('transaction_type', [
+                Finance::TYPE_ORDER_PAYMENT,
+                Finance::TYPE_BONUS
+            ])
+            ->where('status', Finance::STATUS_COMPLETED)
+            ->whereMonth('created_at', Carbon::now()->month)
+            ->whereYear('created_at', Carbon::now()->year)
+            ->sum('amount');
+        $pendingPayments = Finance::where('transaction_type', Finance::TYPE_WITHDRAWAL)
+            ->whereIn('status', [Finance::STATUS_PENDING, Finance::STATUS_PROCESSING])
+            ->sum('amount');
+        $profitMargin = $totalRevenue > 0 ? round((($totalRevenue - $writerPayments) / $totalRevenue) * 100, 1) : 0;
+        $marginChange = 0;
+        $recentTransactions = Finance::latest()->limit(10)->get();
+        
+        // For chart data
+        $chartLabels = [];
+        $revenueData = [];
+        $paymentData = [];
+        
+        return view('admin.finance.payments', compact(
+            'payments',
+            'pendingCount',
+            'pendingAmount',
+            'completedToday',
+            'completedAmountToday',
+            'totalRevenue',
+            'revenueChange',
+            'writerPayments',
+            'pendingPayments',
+            'profitMargin',
+            'marginChange',
+            'recentTransactions',
+            'chartLabels',
+            'revenueData',
+            'paymentData'
         ));
     }
     
@@ -305,7 +703,17 @@ class PaymentController extends Controller
                     return redirect()->route('admin.finance.withdrawals')
                         ->with('success', 'Withdrawal has been processed successfully via M-Pesa.');
                 } else {
-                    throw new \Exception($result['message']);
+                    // Handle failure
+                    $transaction->status = Finance::STATUS_FAILED;
+                    $transaction->description = $transaction->description . ' | Failed: ' . $result['message'];
+                    $transaction->save();
+                    
+                    // Notify the user
+                    $user->notify(new WithdrawalFailed($transaction));
+                    
+                    DB::commit();
+                    
+                    return back()->with('error', 'M-Pesa payment failed: ' . $result['message']);
                 }
             } else {
                 // For manual payment methods
@@ -651,5 +1059,157 @@ class PaymentController extends Controller
             ->orderByDesc('total')
             ->limit(10)
             ->get();
+    }
+    
+    /**
+     * Initiate payment via M-Pesa
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function initiatePayment(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'phone' => 'required|string',
+                'amount' => 'required|numeric|min:1',
+                'order_id' => 'required|integer|exists:orders,id',
+            ]);
+            
+            // Format the phone number
+            $phoneNumber = $this->mpesaService->formatPhoneNumber($validated['phone']);
+            
+            // Get the order
+            $order = Order::findOrFail($validated['order_id']);
+            
+            // Check if the order has already been paid
+            if ($order->payment_status === 'paid') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This order has already been paid.'
+                ], 400);
+            }
+            
+            // Generate a reference (using order number)
+            $reference = 'Order-' . $order->id;
+            
+            // Generate a description
+            $description = 'Payment for Order #' . $order->id;
+            
+            // Initiate STK Push
+            $result = $this->mpesaService->initiateSTKPush(
+                $phoneNumber,
+                $validated['amount'],
+                $reference,
+                $description
+            );
+            
+            if ($result['success']) {
+                // Store the transaction details
+                \App\Models\MpesaTransaction::create([
+                    'checkout_request_id' => $result['checkoutRequestId'],
+                    'phone' => $phoneNumber,
+                    'amount' => $validated['amount'],
+                    'reference' => $reference,
+                    'description' => $description,
+                    'order_id' => $validated['order_id'],
+                    'user_id' => Auth::id(),
+                    'status' => 'pending',
+                ]);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment initiated. Please check your phone to complete the transaction.',
+                    'checkoutRequestId' => $result['checkoutRequestId']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initiate payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Check M-Pesa payment status
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkPaymentStatus(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'checkout_request_id' => 'required|string'
+            ]);
+            
+            $transaction = \App\Models\MpesaTransaction::where('checkout_request_id', $validated['checkout_request_id'])->first();
+            
+            if (!$transaction) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction not found'
+                ], 404);
+            }
+            
+            if ($transaction->status !== 'pending') {
+                return response()->json([
+                    'success' => $transaction->status === 'completed',
+                    'message' => $transaction->status === 'completed' ? 'Payment completed successfully' : 'Payment failed',
+                    'status' => $transaction->status
+                ]);
+            }
+            
+            // Check status with M-Pesa
+            $result = $this->mpesaService->checkSTKStatus($validated['checkout_request_id']);
+            
+            if ($result['success']) {
+                $transaction->status = 'completed';
+                $transaction->transaction_id = $result['data']['ResultCode'] ?? null;
+                $transaction->save();
+                
+                // Update order payment status
+                $order = Order::find($transaction->order_id);
+                if ($order) {
+                    $order->payment_status = 'paid';
+                    $order->paid_at = now();
+                    $order->save();
+                }
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment completed successfully',
+                    'status' => 'completed'
+                ]);
+            } else {
+                if (isset($result['data']['ResultCode']) && $result['data']['ResultCode'] != 0) {
+                    $transaction->status = 'failed';
+                    $transaction->save();
+                    
+                    return response()->json([
+                        'success' => false,
+                        'message' => $result['message'],
+                        'status' => 'failed'
+                    ]);
+                }
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment is still pending',
+                    'status' => 'pending'
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check payment status: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
