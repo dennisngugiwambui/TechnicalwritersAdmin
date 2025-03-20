@@ -8,14 +8,15 @@
 <div class="h-full bg-white rounded-lg shadow-sm overflow-hidden">
     <div class="flex flex-col lg:flex-row h-[calc(100vh-10rem)]">
         <!-- Mobile Header (Only visible on small screens) -->
-        <div class="lg:hidden flex justify-between items-center p-3 bg-white border-b sticky top-0 z-10">
-            <button id="toggleSidebar" class="p-1 text-gray-600 focus:outline-none">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
-            </button>
-            
-            @if(isset($currentConversation) && $currentConversation)
+        <
+            <div class="lg:hidden flex justify-between items-center p-3 bg-white border-b sticky top-0 z-10">
+                <button id="backToList" class="p-1 text-gray-600 focus:outline-none focus:text-gray-900">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </button>
+                
+                @if(isset($currentConversation) && $currentConversation)
                 <div class="flex items-center">
                     <h2 class="text-base font-medium text-gray-900">{{ $currentConversation['participant']->name }}</h2>
                     @if($currentConversation['order'])
@@ -24,17 +25,16 @@
                         </a>
                     @endif
                 </div>
-            @else
+                @else
                 <div class="text-base font-medium text-gray-900">Messages</div>
-            @endif
-            
-            <a href="{{ route('admin.messages.create') }}" class="p-1.5 text-primary-600 hover:text-primary-700 focus:outline-none">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-            </a>
-        </div>
-
+                @endif
+                
+                <a href="{{ route('admin.messages.create') }}" class="p-1.5 text-primary-600 hover:text-primary-700 focus:outline-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                </a>
+            </div>
         <!-- Left Sidebar (Conversations) -->
         <div id="sidebar" class="w-full lg:w-80 xl:w-96 border-r flex flex-col bg-white lg:block transform transition-transform duration-300 ease-in-out" 
              style="display: {{ isset($currentConversation) && !request()->is('admin/messages/create') ? 'none' : 'flex' }};">
