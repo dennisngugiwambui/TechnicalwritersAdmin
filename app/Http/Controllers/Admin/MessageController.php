@@ -139,6 +139,45 @@ class MessageController extends Controller
         ));
     }
 
+        /**
+     * Display the specified message.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $message = Message::with(['sender', 'receiver', 'order'])->findOrFail($id);
+        
+        // Mark message as read if it's unread
+        if (!$message->read_at) {
+            $message->read_at = now();
+            $message->save();
+        }
+        
+        // Get conversation (all messages related to this order or conversation)
+        $conversation = Message::where(function($query) use ($message) {
+                // If it's order-related
+                if ($message->order_id) {
+                    $query->where('order_id', $message->order_id);
+                } else {
+                    // For direct messages (non-order related), get the conversation between these users
+                    $query->where(function($q) use ($message) {
+                        $q->where('sender_id', $message->sender_id)
+                        ->where('receiver_id', $message->receiver_id);
+                    })->orWhere(function($q) use ($message) {
+                        $q->where('sender_id', $message->receiver_id)
+                        ->where('receiver_id', $message->sender_id);
+                    });
+                }
+            })
+            ->with(['sender', 'receiver'])
+            ->orderBy('created_at', 'asc')
+            ->get();
+        
+        return view('admin.messages.show', compact('message', 'conversation'));
+    }
+
     /**
      * Show the form for creating a new message.
      *
