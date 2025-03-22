@@ -84,89 +84,82 @@ class WriterController extends Controller
         return view('admin.writers', compact('writers', 'stats'));
     }
     
-    /**
-     * Display the specified writer.
+        /**
+     * Reply to a message.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
-     * @return \Illuminate\View\View
+     * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function reply(Request $request, $id)
     {
-        $writer = User::where('usertype', User::ROLE_WRITER)
-            ->with([
-                'writerProfile',
-                'ordersAsWriter' => function($query) {
-                    $query->latest()->limit(10);
-                },
-                'financialTransactions' => function($query) {
-                    $query->latest()->limit(10);
-                }
-            ])
-            ->findOrFail($id);
-            
-        // Get writer statistics
-        $stats = [
-            'total_orders' => $writer->ordersAsWriter()->count(),
-            'completed_orders' => $writer->ordersAsWriter()
-                ->whereIn('status', [
-                    'completed', 'paid', 'finished'
-                ])
-                ->count(),
-            'in_progress' => $writer->ordersAsWriter()
-                ->whereIn('status', [
-                    'confirmed', 'in_progress', 'done', 'delivered'
-                ])
-                ->count(),
-            'revision_orders' => $writer->ordersAsWriter()
-                ->where('status', 'revision')
-                ->count(),
-            'dispute_orders' => $writer->ordersAsWriter()
-                ->where('status', 'dispute')
-                ->count(),
-            'total_earnings' => $writer->writerProfile->earnings ?? 0,
-            'available_balance' => $writer->getAvailableBalance(),
-            'pending_withdrawals' => $writer->financialTransactions()
-                ->where('transaction_type', 'withdrawal')
-                ->where('status', 'pending')
-                ->sum('amount')
-        ];
+        $request->validate([
+            'message' => 'required|string',
+        ]);
         
-        // Get orders by discipline
-        $ordersByDiscipline = $writer->ordersAsWriter()
-            ->select('discipline', DB::raw('count(*) as count'))
-            ->whereNotNull('discipline')
-            ->groupBy('discipline')
-            ->orderByDesc('count')
-            ->limit(5)
-            ->get();
+        // Determine if this is a reply to an order or a direct message
+        if ($request->has('order_id')) {
+            $orderId = $request->order_id;
+            $replyAs = $request->reply_as ?? 'support';
             
-        // Get recent activity
-        $recentActivity = collect();
-        
-        // Add recent orders
-        $recentOrders = $writer->ordersAsWriter()->latest()->limit(5)->get();
-        foreach ($recentOrders as $order) {
-            $recentActivity->push([
-                'type' => 'order',
-                'data' => $order,
-                'date' => $order->created_at
+            // Create message depending on who we're replying as
+            if ($replyAs === 'client') {
+                // Get the client ID from the order
+                $order = Order::findOrFail($orderId);
+                
+                // Reply as client
+                $newMessage = Message::create([
+                    'order_id' => $orderId,
+                    'user_id' => $order->client_id,
+                    'receiver_id' => null, // To all (including assigned writer)
+                    'title' => 'RE: Order #' . $orderId,
+                    'message' => $request->message,
+                    'message_type' => 'client_message',
+                    'is_general' => false,
+                ]);
+            } else {
+                // Reply as support
+                $newMessage = Message::create([
+                    'order_id' => $orderId,
+                    'user_id' => auth()->id(),
+                    'receiver_id' => null, // To all (including client and assigned writer)
+                    'title' => 'RE: Order #' . $orderId,
+                    'message' => $request->message,
+                    'message_type' => 'support_message',
+                    'is_general' => false,
+                ]);
+            }
+        } else {
+            // Direct message reply
+            $newMessage = Message::create([
+                'user_id' => auth()->id(),
+                'receiver_id' => $request->receiver_id,
+                'title' => 'RE: ' . ($request->title ?? 'No Subject'),
+                'message' => $request->message,
+                'message_type' => 'direct_message',
+                'is_general' => false,
             ]);
         }
         
-        // Add recent transactions
-        $recentTransactions = $writer->financialTransactions()->latest()->limit(5)->get();
-        foreach ($recentTransactions as $transaction) {
-            $recentActivity->push([
-                'type' => 'transaction',
-                'data' => $transaction,
-                'date' => $transaction->created_at
-            ]);
+        // Handle file attachments if your application supports it
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs('uploads', $fileName, 'public');
+                
+                $newMessage->files()->create([
+                    'name' => $fileName,
+                    'path' => $filePath,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'uploaded_by' => auth()->id(),
+                ]);
+            }
         }
         
-        // Sort by date
-        $recentActivity = $recentActivity->sortByDesc('date')->take(10);
-        
-        return view('admin.writers.show', compact('writer', 'stats', 'ordersByDiscipline', 'recentActivity'));
+        return redirect()->route('admin.messages.show', $newMessage->id)
+            ->with('success', 'Your reply has been sent successfully.');
     }
     
     /**
