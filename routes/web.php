@@ -9,7 +9,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\MessageController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\AdminHomeController;
-use App\Http\Controllers\Admin\MpesaController;
+use App\Http\Controllers\Api\MpesaController; // Changed from Admin to Api namespace
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\FileController;
 
@@ -131,6 +131,21 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::get('/settings/exchange-rate', [SettingsController::class, 'exchangeRate'])->name('settings.exchange-rate');
     Route::post('/settings/exchange-rate', [SettingsController::class, 'updateExchangeRate'])->name('settings.update-exchange-rate');
     
+    // Add missing routes for settings
+    Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::put('/settings/exchange-rate', [SettingsController::class, 'updateExchangeRate'])->name('settings.update-exchange-rate');
+    Route::put('/settings/mpesa', [SettingsController::class, 'updateMpesa'])->name('settings.update-mpesa');
+    Route::put('/settings/email-template', [SettingsController::class, 'updateEmailTemplate'])->name('settings.update-email-template');
+    Route::post('/settings/toggle-maintenance', [SettingsController::class, 'toggleMaintenance'])->name('settings.toggle-maintenance');
+    Route::post('/settings/create-backup', [SettingsController::class, 'createBackup'])->name('settings.create-backup');
+    Route::get('/settings/download-backup/{filename}', [SettingsController::class, 'downloadBackup'])->name('settings.download-backup');
+    Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
+    
+    // Add missing admin users routes
+    Route::post('/users', [SettingsController::class, 'storeUser'])->name('users.store');
+    Route::put('/users/{id}', [SettingsController::class, 'updateUser'])->name('users.update');
+    Route::delete('/users/{id}', [SettingsController::class, 'destroyUser'])->name('users.destroy');
+    
     // Profile routes
     Route::get('/profile', [HomeController::class, 'profile'])->name('profile.show');
     Route::put('/profile', [HomeController::class, 'updateProfile'])->name('profile.update');
@@ -148,12 +163,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payment/mpesa/status', [PaymentController::class, 'checkPaymentStatus'])->name('payment.mpesa.status');
 });
 
-// M-Pesa callback routes
-Route::post('/api/mpesa/stk/callback', [MpesaController::class, 'stkCallback'])->name('api.mpesa.stk.callback');
-Route::post('/api/mpesa/b2c/result', [MpesaController::class, 'b2cResultCallback'])->name('api.mpesa.b2c.result');
-Route::post('/api/mpesa/b2c/timeout', [MpesaController::class, 'b2cTimeoutCallback'])->name('api.mpesa.b2c.timeout');
+// M-Pesa callback routes - Now using Api namespace for MpesaController
+Route::post('/api/mpesa/stk/callback', [MpesaController::class, 'handleCallback'])->name('api.mpesa.stk.callback');
+Route::post('/api/mpesa/b2c/result', [MpesaController::class, 'handleResult'])->name('api.mpesa.b2c.result');
+Route::post('/api/mpesa/b2c/timeout', [MpesaController::class, 'handleTimeout'])->name('api.mpesa.b2c.timeout');
 
 // Legacy M-Pesa routes (keeping for backward compatibility)
-Route::post('/api/mpesa/callback', [MpesaController::class, 'callback'])->name('mpesa.callback');
-Route::post('/api/mpesa/timeout', [MpesaController::class, 'timeout'])->name('mpesa.timeout');
-Route::post('/api/mpesa/result', [MpesaController::class, 'result'])->name('mpesa.result');
+Route::post('/api/mpesa/callback', [MpesaController::class, 'handleCallback'])->name('mpesa.callback');
+Route::post('/api/mpesa/timeout', [MpesaController::class, 'handleTimeout'])->name('mpesa.timeout');
+Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name('mpesa.result');

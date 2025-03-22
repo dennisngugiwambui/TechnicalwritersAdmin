@@ -10,6 +10,7 @@ use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class MessageController extends Controller
@@ -579,15 +580,17 @@ class MessageController extends Controller
     public function destroy(Request $request, $messageId)
     {
         $message = Message::findOrFail($messageId);
-        
+
+
         // Check if user is allowed to delete this message
-        if ($message->user_id != Auth::id() && !Auth::user()->isAdmin()) {
+        if ($message->user_id != Auth::id() && Auth::user()->usertype !== User::ROLE_ADMIN) {
             return redirect()->back()->with('error', 'You are not authorized to delete this message.');
         }
+    
         
         // Delete associated files
         foreach ($message->files as $file) {
-            \Storage::delete($file->path);
+            Storage::delete($file->path);
             $file->delete();
         }
         
