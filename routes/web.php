@@ -63,6 +63,10 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/orders/{order}/dispute', [OrderController::class, 'dispute'])->name('orders.dispute');
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
     Route::post('/orders/upload-files', [OrderController::class, 'uploadFiles'])->name('orders.upload-files');
+
+
+    Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');
+    Route::post('/settings/toggle-writer-debug', [SettingsController::class, 'toggleWriterDebug'])->name('settings.toggle-writer-debug');
     
     // Writers Management
     Route::get('/writers', [WriterController::class, 'index'])->name('writers.index');
@@ -173,6 +177,5 @@ Route::post('/api/mpesa/callback', [MpesaController::class, 'handleCallback'])->
 Route::post('/api/mpesa/timeout', [MpesaController::class, 'handleTimeout'])->name('mpesa.timeout');
 Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name('mpesa.result');
 
-// Add these routes to your admin routes group
-Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');
-Route::post('/settings/toggle-writer-debug', [SettingsController::class, 'toggleWriterDebug'])->name('settings.toggle-writer-debug');
+
+

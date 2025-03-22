@@ -682,7 +682,6 @@ Technical Writers Team" }}</textarea>
                 </table>
             </div>
         </div>
-        
         <!-- System Info Tab -->
         <div x-show="activeTab === 'system'" class="bg-white shadow-sm rounded-lg overflow-hidden">
             <div class="p-6 border-b border-gray-200">
@@ -694,6 +693,7 @@ Technical Writers Team" }}</textarea>
             
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- First column - Application Info -->
                     <div>
                         <h4 class="text-base font-medium text-gray-900 mb-4">Application</h4>
                         
@@ -731,6 +731,7 @@ Technical Writers Team" }}</textarea>
                         </dl>
                     </div>
                     
+                    <!-- Second column - Server Info -->
                     <div>
                         <h4 class="text-base font-medium text-gray-900 mb-4">Server</h4>
                         
@@ -763,15 +764,17 @@ Technical Writers Team" }}</textarea>
                     </div>
                 </div>
                 
+                <!-- New section: Site Modes -->
                 <div class="mt-8">
-                    <h4 class="text-base font-medium text-gray-900 mb-4">Maintenance & Backups</h4>
+                    <h4 class="text-base font-medium text-gray-900 mb-4">Site Modes</h4>
                     
                     <div class="space-y-4">
+                        <!-- Admin Dashboard Maintenance Mode -->
                         <div class="bg-gray-50 p-4 rounded-md">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h5 class="text-sm font-medium text-gray-900">Application Maintenance</h5>
-                                    <p class="text-xs text-gray-500 mt-1">Put the application into maintenance mode for updates.</p>
+                                    <h5 class="text-sm font-medium text-gray-900">Admin Maintenance Mode</h5>
+                                    <p class="text-xs text-gray-500 mt-1">Put the admin dashboard into maintenance mode for updates.</p>
                                 </div>
                                 <form method="POST" action="{{ route('admin.settings.toggle-maintenance') }}">
                                     @csrf
@@ -783,6 +786,43 @@ Technical Writers Team" }}</textarea>
                             </div>
                         </div>
                         
+                        <!-- Writers Portal Maintenance Mode -->
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h5 class="text-sm font-medium text-gray-900">Writers Portal Maintenance Mode</h5>
+                                    <p class="text-xs text-gray-500 mt-1">Put the writers portal (technicalwriters.co.ke) into maintenance mode.</p>
+                                </div>
+                                <form method="POST" action="{{ route('admin.settings.toggle-writer-maintenance') }}">
+                                    @csrf
+                                    @method('POST')
+                                    <input type="hidden" name="site" value="writers">
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white {{ isset($writerPortalMaintenance) && $writerPortalMaintenance ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700' }} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        {{ isset($writerPortalMaintenance) && $writerPortalMaintenance ? 'Exit Maintenance Mode' : 'Enable Maintenance Mode' }}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Writers Portal Debug Mode -->
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h5 class="text-sm font-medium text-gray-900">Writers Portal Debug Mode</h5>
+                                    <p class="text-xs text-gray-500 mt-1 max-w-lg">Toggle debug mode for the writers portal. Warning: Enable only temporarily for troubleshooting as it may expose sensitive information.</p>
+                                </div>
+                                <form method="POST" action="{{ route('admin.settings.toggle-writer-debug') }}">
+                                    @csrf
+                                    @method('POST')
+                                    <input type="hidden" name="site" value="writers">
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white {{ isset($writerPortalDebug) && $writerPortalDebug ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700' }} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                        {{ isset($writerPortalDebug) && $writerPortalDebug ? 'Disable Debug Mode' : 'Enable Debug Mode' }}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Database Backup -->
                         <div class="bg-gray-50 p-4 rounded-md">
                             <div class="flex items-center justify-between">
                                 <div>
@@ -815,6 +855,7 @@ Technical Writers Team" }}</textarea>
                             @endif
                         </div>
                         
+                        <!-- Clear Cache -->
                         <div class="bg-gray-50 p-4 rounded-md">
                             <div class="flex items-center justify-between">
                                 <div>
@@ -834,7 +875,8 @@ Technical Writers Team" }}</textarea>
                 </div>
             </div>
         </div>
-    </div>
+        
+
     
     <!-- Add Admin Modal -->
     <div x-data="{ open: false }" 
