@@ -36,8 +36,29 @@ class SettingsController extends Controller
         
         // Get recent backups
         $backups = $this->getRecentBackups();
+
+        // Check writer portal status
+        $writerPortalMaintenance = file_exists(storage_path('framework/down_writers'));
         
-        return view('admin.settings', compact('exchangeRate', 'adminUsers', 'stats', 'emailTemplates', 'backups'));
+        // Check writer portal debug status
+        $writerPortalDebug = false;
+        $writerEnvFile = '/path/to/your/writers/portal/.env';
+        if (file_exists($writerEnvFile)) {
+            $writerEnv = file_get_contents($writerEnvFile);
+            $writerPortalDebug = (bool) preg_match('/APP_DEBUG=true/i', $writerEnv);
+        }
+        
+        return view('admin.settings', compact(
+            'exchangeRate', 
+            'adminUsers', 
+            'stats', 
+            'emailTemplates', 
+            'backups',
+            'writerPortalMaintenance',
+            'writerPortalDebug'
+        ));
+        
+        //return view('admin.settings', compact('exchangeRate', 'adminUsers', 'stats', 'emailTemplates', 'backups'));
     }
     
     /**
@@ -518,5 +539,87 @@ class SettingsController extends Controller
         $user->delete();
         
         return redirect()->route('admin.settings', ['#users'])->with('success', 'Admin user deleted successfully');
+    }
+
+        /**
+     * Toggle maintenance mode for the writers portal.
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function toggleWriterMaintenance()
+    {
+        try {
+            // Determine the current status
+            $maintenanceFile = storage_path('framework/down_writers');
+            $isDown = file_exists($maintenanceFile);
+            
+            if ($isDown) {
+                // Bring the writer portal up
+                if (file_exists($maintenanceFile)) {
+                    unlink($maintenanceFile);
+                }
+                $message = 'Writer portal is now live';
+            } else {
+                // Put the writer portal into maintenance mode
+                file_put_contents($maintenanceFile, json_encode([
+                    'time' => time(),
+                    'message' => 'The writers portal is currently down for maintenance. Please check back shortly.',
+                    'retry' => 60
+                ]));
+                $message = 'Writer portal is now in maintenance mode';
+            }
+            
+            return redirect()->route('admin.settings', ['#system'])->with('success', $message);
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle writer portal maintenance mode: ' . $e->getMessage());
+            return redirect()->route('admin.settings', ['#system'])->with('error', 'Failed to toggle writer portal maintenance mode');
+        }
+    }
+
+    /**
+     * Toggle debug mode for the writers portal.
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function toggleWriterDebug()
+    {
+        try {
+            // Path to the writers portal .env file
+            $envFile = '/path/to/your/writers/portal/.env';
+            
+            if (!file_exists($envFile)) {
+                return redirect()->route('admin.settings', ['#system'])
+                    ->with('error', 'Writers portal .env file not found');
+            }
+            
+            // Read the current .env file
+            $env = file_get_contents($envFile);
+            
+            // Check if debug is enabled
+            if (preg_match('/APP_DEBUG=true/i', $env)) {
+                // Disable debug mode
+                $env = preg_replace('/APP_DEBUG=true/i', 'APP_DEBUG=false', $env);
+                $message = 'Debug mode has been disabled for the writers portal';
+            } else {
+                // Enable debug mode
+                $env = preg_replace('/APP_DEBUG=false/i', 'APP_DEBUG=true', $env);
+                $message = 'Debug mode has been enabled for the writers portal';
+            }
+            
+            // Write the updated .env file
+            file_put_contents($envFile, $env);
+            
+            // Clear config cache on the writers portal
+            // This is a simplistic approach - in production you might want to use
+            // SSH or an API to trigger cache clearing on the remote server
+            if (function_exists('shell_exec')) {
+                shell_exec('cd /path/to/your/writers/portal && php artisan config:clear');
+            }
+            
+            return redirect()->route('admin.settings', ['#system'])->with('success', $message);
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle writer portal debug mode: ' . $e->getMessage());
+            return redirect()->route('admin.settings', ['#system'])->with('error', 'Failed to toggle writer portal debug mode: ' . $e->getMessage());
+        }
     }
 }
