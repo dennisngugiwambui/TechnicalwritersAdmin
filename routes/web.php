@@ -172,3 +172,7 @@ Route::post('/api/mpesa/b2c/timeout', [MpesaController::class, 'handleTimeout'])
 Route::post('/api/mpesa/callback', [MpesaController::class, 'handleCallback'])->name('mpesa.callback');
 Route::post('/api/mpesa/timeout', [MpesaController::class, 'handleTimeout'])->name('mpesa.timeout');
 Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name('mpesa.result');
+
+// Add these routes to your admin routes group
+Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');
+Route::post('/settings/toggle-writer-debug', [SettingsController::class, 'toggleWriterDebug'])->name('settings.toggle-writer-debug');
