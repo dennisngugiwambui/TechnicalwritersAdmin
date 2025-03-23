@@ -139,6 +139,7 @@ class MessageController extends Controller
         ));
     }
 
+
         /**
      * Display the specified message.
      *
@@ -147,7 +148,7 @@ class MessageController extends Controller
      */
     public function show($id)
     {
-        $message = Message::with(['sender', 'receiver', 'order'])->findOrFail($id);
+        $message = Message::with(['user', 'receiver', 'order', 'files'])->findOrFail($id);
         
         // Mark message as read if it's unread
         if (!$message->read_at) {
@@ -163,15 +164,15 @@ class MessageController extends Controller
                 } else {
                     // For direct messages (non-order related), get the conversation between these users
                     $query->where(function($q) use ($message) {
-                        $q->where('sender_id', $message->sender_id)
+                        $q->where('user_id', $message->user_id)
                         ->where('receiver_id', $message->receiver_id);
                     })->orWhere(function($q) use ($message) {
-                        $q->where('sender_id', $message->receiver_id)
-                        ->where('receiver_id', $message->sender_id);
+                        $q->where('user_id', $message->receiver_id)
+                        ->where('receiver_id', $message->user_id);
                     });
                 }
             })
-            ->with(['sender', 'receiver'])
+            ->with(['user', 'receiver', 'files'])
             ->orderBy('created_at', 'asc')
             ->get();
         

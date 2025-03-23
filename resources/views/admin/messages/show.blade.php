@@ -37,19 +37,19 @@
             <div>
                 <h4 class="text-xs uppercase font-semibold text-gray-500 mb-1">From</h4>
                 <div class="flex items-center">
-                    @if($message->sender)
+                    @if($message->user)
                         <div class="flex-shrink-0 h-8 w-8 mr-2">
-                            @if($message->sender->profile_picture)
-                                <img class="h-8 w-8 rounded-full object-cover" src="{{ asset($message->sender->profile_picture) }}" alt="{{ $message->sender->name }}">
+                            @if($message->user->profile_picture)
+                                <img class="h-8 w-8 rounded-full object-cover" src="{{ asset($message->user->profile_picture) }}" alt="{{ $message->user->name }}">
                             @else
                                 <div class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                                    <span class="text-primary-600 font-medium text-sm">{{ strtoupper(substr($message->sender->name, 0, 1)) }}</span>
+                                    <span class="text-primary-600 font-medium text-sm">{{ $message->getSenderInitial() }}</span>
                                 </div>
                             @endif
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-gray-800">{{ $message->sender->name }}</p>
-                            <p class="text-xs text-gray-500">{{ $message->sender->email }}</p>
+                            <p class="text-sm font-medium text-gray-800">{{ $message->user->name }}</p>
+                            <p class="text-xs text-gray-500">{{ $message->user->email }}</p>
                         </div>
                     @else
                         <p class="text-sm text-gray-600">System Message</p>
@@ -66,7 +66,7 @@
                                 <img class="h-8 w-8 rounded-full object-cover" src="{{ asset($message->receiver->profile_picture) }}" alt="{{ $message->receiver->name }}">
                             @else
                                 <div class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                                    <span class="text-primary-600 font-medium text-sm">{{ strtoupper(substr($message->receiver->name, 0, 1)) }}</span>
+                                    <span class="text-primary-600 font-medium text-sm">{{ $message->getReceiverInitial() }}</span>
                                 </div>
                             @endif
                         </div>
@@ -97,30 +97,29 @@
     <!-- Message Subject -->
     <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-800">
-            {{ $message->subject ?? 'No Subject' }}
+            {{ $message->title ?? 'No Subject' }}
         </h3>
     </div>
     
     <!-- Message Content -->
     <div class="px-6 py-4 border-b border-gray-200">
         <div class="prose max-w-none">
-            {!! nl2br(e($message->content)) !!}
+            {!! nl2br(e($message->message)) !!}
         </div>
         
-        @if($message->attachments && count(json_decode($message->attachments)) > 0)
+        @if($message->files && $message->files->count() > 0)
             <div class="mt-4 pt-4 border-t border-gray-200">
                 <h4 class="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    @foreach(json_decode($message->attachments) as $attachment)
-                        <a href="{{ asset('storage/attachments/' . $attachment->filename) }}" 
-                           target="_blank"
+                    @foreach($message->files as $file)
+                        <a href="{{ route('files.download', $file->id) }}" 
                            class="flex items-center p-2 border border-gray-200 rounded-md hover:bg-gray-50">
                             <div class="bg-gray-100 p-2 rounded mr-2">
                                 <i class="fas fa-file-alt text-gray-500"></i>
                             </div>
                             <div class="overflow-hidden">
-                                <p class="text-sm font-medium text-primary-600 truncate">{{ $attachment->original_name }}</p>
-                                <p class="text-xs text-gray-500">{{ $attachment->size }}</p>
+                                <p class="text-sm font-medium text-primary-600 truncate">{{ $file->original_name }}</p>
+                                <p class="text-xs text-gray-500">{{ $file->size_formatted }}</p>
                             </div>
                         </a>
                     @endforeach
@@ -139,19 +138,19 @@
                     <div class="flex justify-between">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-8 w-8 mr-2">
-                                @if($msg->sender && $msg->sender->profile_picture)
-                                    <img class="h-8 w-8 rounded-full object-cover" src="{{ asset($msg->sender->profile_picture) }}" alt="{{ $msg->sender->name }}">
+                                @if($msg->user && $msg->user->profile_picture)
+                                    <img class="h-8 w-8 rounded-full object-cover" src="{{ asset($msg->user->profile_picture) }}" alt="{{ $msg->user->name }}">
                                 @else
-                                    <div class="h-8 w-8 rounded-full bg-{{ $msg->sender ? 'primary' : 'gray' }}-100 flex items-center justify-center">
-                                        <span class="text-{{ $msg->sender ? 'primary' : 'gray' }}-600 font-medium text-sm">
-                                            {{ $msg->sender ? strtoupper(substr($msg->sender->name, 0, 1)) : 'S' }}
+                                    <div class="h-8 w-8 rounded-full bg-{{ $msg->user ? 'primary' : 'gray' }}-100 flex items-center justify-center">
+                                        <span class="text-{{ $msg->user ? 'primary' : 'gray' }}-600 font-medium text-sm">
+                                            {{ $msg->user ? $msg->getSenderInitial() : 'S' }}
                                         </span>
                                     </div>
                                 @endif
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-800">
-                                    {{ $msg->sender ? $msg->sender->name : 'System Message' }}
+                                    {{ $msg->user ? $msg->user->name : 'System Message' }}
                                 </p>
                                 <p class="text-xs text-gray-500">{{ $msg->created_at->format('M d, Y h:i A') }}</p>
                             </div>
@@ -164,15 +163,15 @@
                         @endif
                     </div>
                     
-                    @if($msg->subject)
-                        <h4 class="text-sm font-medium text-gray-700 mt-2">{{ $msg->subject }}</h4>
+                    @if($msg->title)
+                        <h4 class="text-sm font-medium text-gray-700 mt-2">{{ $msg->title }}</h4>
                     @endif
                     
                     <div class="mt-2 text-sm text-gray-600">
-                        @if(strlen($msg->content) > 200 && $msg->id !== $message->id)
-                            {!! nl2br(e(substr($msg->content, 0, 200))) !!}...
+                        @if(strlen($msg->message) > 200 && $msg->id !== $message->id)
+                            {!! nl2br(e(substr($msg->message, 0, 200))) !!}...
                         @else
-                            {!! nl2br(e($msg->content)) !!}
+                            {!! nl2br(e($msg->message)) !!}
                         @endif
                     </div>
                 </div>
@@ -193,14 +192,16 @@
             
             <div class="mb-4">
                 <label for="reply_content" class="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                <textarea id="reply_content" name="content" rows="5" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-md" required></textarea>
+                <textarea id="reply_content" name="message" rows="5" class="shadow-sm focus:ring-primary-500 focus:border-primary-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-md" required></textarea>
             </div>
             
+            @if(isset($allowAttachments) && $allowAttachments)
             <div class="mb-4">
                 <label for="attachments" class="block text-sm font-medium text-gray-700 mb-1">Attachments (Optional)</label>
                 <input type="file" id="attachments" name="attachments[]" multiple class="shadow-sm focus:ring-primary-500 focus:border-primary-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-md">
                 <p class="mt-1 text-xs text-gray-500">You can upload multiple files. Maximum size: 10MB per file.</p>
             </div>
+            @endif
             
             <div class="flex justify-end">
                 @if($message->order_id)
@@ -220,7 +221,7 @@
                         </button>
                     </div>
                 @else
-                    <input type="hidden" name="receiver_id" value="{{ $message->sender_id }}">
+                    <input type="hidden" name="receiver_id" value="{{ $message->user_id }}">
                     
                     <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                         <i class="fas fa-paper-plane mr-1.5"></i>

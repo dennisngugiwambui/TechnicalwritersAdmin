@@ -84,82 +84,89 @@ class WriterController extends Controller
         return view('admin.writers', compact('writers', 'stats'));
     }
     
-        /**
-     * Reply to a message.
+    /**
+     * Display the specified writer.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\View\View
      */
-    public function reply(Request $request, $id)
+    public function show($id)
     {
-        $request->validate([
-            'message' => 'required|string',
-        ]);
-        
-        // Determine if this is a reply to an order or a direct message
-        if ($request->has('order_id')) {
-            $orderId = $request->order_id;
-            $replyAs = $request->reply_as ?? 'support';
+        $writer = User::where('usertype', User::ROLE_WRITER)
+            ->with([
+                'writerProfile',
+                'ordersAsWriter' => function($query) {
+                    $query->latest()->limit(10);
+                },
+                'financialTransactions' => function($query) {
+                    $query->latest()->limit(10);
+                }
+            ])
+            ->findOrFail($id);
             
-            // Create message depending on who we're replying as
-            if ($replyAs === 'client') {
-                // Get the client ID from the order
-                $order = Order::findOrFail($orderId);
-                
-                // Reply as client
-                $newMessage = Message::create([
-                    'order_id' => $orderId,
-                    'user_id' => $order->client_id,
-                    'receiver_id' => null, // To all (including assigned writer)
-                    'title' => 'RE: Order #' . $orderId,
-                    'message' => $request->message,
-                    'message_type' => 'client_message',
-                    'is_general' => false,
-                ]);
-            } else {
-                // Reply as support
-                $newMessage = Message::create([
-                    'order_id' => $orderId,
-                    'user_id' => auth()->id(),
-                    'receiver_id' => null, // To all (including client and assigned writer)
-                    'title' => 'RE: Order #' . $orderId,
-                    'message' => $request->message,
-                    'message_type' => 'support_message',
-                    'is_general' => false,
-                ]);
-            }
-        } else {
-            // Direct message reply
-            $newMessage = Message::create([
-                'user_id' => auth()->id(),
-                'receiver_id' => $request->receiver_id,
-                'title' => 'RE: ' . ($request->title ?? 'No Subject'),
-                'message' => $request->message,
-                'message_type' => 'direct_message',
-                'is_general' => false,
+        // Get writer statistics
+        $stats = [
+            'total_orders' => $writer->ordersAsWriter()->count(),
+            'completed_orders' => $writer->ordersAsWriter()
+                ->whereIn('status', [
+                    'completed', 'paid', 'finished'
+                ])
+                ->count(),
+            'in_progress' => $writer->ordersAsWriter()
+                ->whereIn('status', [
+                    'confirmed', 'in_progress', 'done', 'delivered'
+                ])
+                ->count(),
+            'revision_orders' => $writer->ordersAsWriter()
+                ->where('status', 'revision')
+                ->count(),
+            'dispute_orders' => $writer->ordersAsWriter()
+                ->where('status', 'dispute')
+                ->count(),
+            'total_earnings' => $writer->writerProfile->earnings ?? 0,
+            'available_balance' => $writer->getAvailableBalance(),
+            'pending_withdrawals' => $writer->financialTransactions()
+                ->where('transaction_type', 'withdrawal')
+                ->where('status', 'pending')
+                ->sum('amount')
+        ];
+        
+        // Get orders by discipline
+        $ordersByDiscipline = $writer->ordersAsWriter()
+            ->select('discipline', DB::raw('count(*) as count'))
+            ->whereNotNull('discipline')
+            ->groupBy('discipline')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+            
+        // Get recent activity
+        $recentActivity = collect();
+        
+        // Add recent orders
+        $recentOrders = $writer->ordersAsWriter()->latest()->limit(5)->get();
+        foreach ($recentOrders as $order) {
+            $recentActivity->push([
+                'type' => 'order',
+                'data' => $order,
+                'date' => $order->created_at
             ]);
         }
         
-        // Handle file attachments if your application supports it
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('uploads', $fileName, 'public');
-                
-                $newMessage->files()->create([
-                    'name' => $fileName,
-                    'path' => $filePath,
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                    'uploaded_by' => auth()->id(),
-                ]);
-            }
+        // Add recent transactions
+        $recentTransactions = $writer->financialTransactions()->latest()->limit(5)->get();
+        foreach ($recentTransactions as $transaction) {
+            $recentActivity->push([
+                'type' => 'transaction',
+                'data' => $transaction,
+                'date' => $transaction->created_at
+            ]);
         }
         
-        return redirect()->route('admin.messages.show', $newMessage->id)
-            ->with('success', 'Your reply has been sent successfully.');
+        // Sort by date
+        $recentActivity = $recentActivity->sortByDesc('date')->take(10);
+        
+        return view('admin.writers.show', compact('writer', 'stats', 'ordersByDiscipline', 'recentActivity'));
     }
     
     /**
@@ -239,5 +246,91 @@ class WriterController extends Controller
         $writer->writerProfile->save();
         
         return redirect()->back()->with('success', "Writer {$writer->name} verification has been rejected.");
+    }
+
+        /**
+     * Show the form for editing the specified writer.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $writer = User::where('usertype', User::ROLE_WRITER)
+            ->with('writerProfile')
+            ->findOrFail($id);
+        
+        return view('admin.writers.edit', compact('writer'));
+    }
+
+    /**
+     * Update the specified writer in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        $writer = User::where('usertype', User::ROLE_WRITER)->findOrFail($id);
+        
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $id,
+            'phone' => 'nullable|string|max:20',
+            'status' => 'required|in:active,suspended,pending,inactive',
+            'title' => 'nullable|string|max:255',
+            'education_level' => 'nullable|string|max:255',
+            'experience_years' => 'nullable|numeric|min:0|max:50',
+            'areas_of_expertise' => 'nullable|string',
+            'bio' => 'nullable|string',
+            'commission_rate' => 'nullable|numeric|min:0|max:1',
+        ]);
+        
+        // Update user data
+        $writer->name = $validated['name'];
+        $writer->email = $validated['email'];
+        $writer->phone = $validated['phone'];
+        $writer->status = $validated['status'];
+        $writer->save();
+        
+        // Update or create writer profile
+        if (!$writer->writerProfile) {
+            $writer->writerProfile()->create([
+                'title' => $validated['title'] ?? null,
+                'education_level' => $validated['education_level'] ?? null,
+                'experience_years' => $validated['experience_years'] ?? null,
+                'areas_of_expertise' => $validated['areas_of_expertise'] ?? null,
+                'bio' => $validated['bio'] ?? null,
+            ]);
+        } else {
+            $writer->writerProfile->update([
+                'title' => $validated['title'] ?? $writer->writerProfile->title,
+                'education_level' => $validated['education_level'] ?? $writer->writerProfile->education_level,
+                'experience_years' => $validated['experience_years'] ?? $writer->writerProfile->experience_years,
+                'areas_of_expertise' => $validated['areas_of_expertise'] ?? $writer->writerProfile->areas_of_expertise,
+                'bio' => $validated['bio'] ?? $writer->writerProfile->bio,
+            ]);
+        }
+        
+        // Update commission rate if provided
+        if (isset($validated['commission_rate'])) {
+            $writer->writerProfile->update([
+                'commission_rate' => $validated['commission_rate'],
+            ]);
+        }
+        
+        // Handle profile picture upload if included
+        if ($request->hasFile('profile_picture')) {
+            $file = $request->file('profile_picture');
+            $fileName = time() . '_' . $file->getClientOriginalName();
+            $filePath = $file->storeAs('profile_pictures', $fileName, 'public');
+            
+            $writer->profile_picture = 'storage/' . $filePath;
+            $writer->save();
+        }
+        
+        return redirect()->route('admin.writers.show', $writer->id)
+            ->with('success', 'Writer profile updated successfully.');
     }
 }

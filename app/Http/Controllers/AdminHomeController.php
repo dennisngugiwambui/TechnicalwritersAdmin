@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Finance;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class AdminHomeController extends Controller
 {
@@ -242,5 +244,82 @@ class AdminHomeController extends Controller
         }
         
         return [$labels, $counts];
+    }
+
+    // Your existing methods...
+    
+    /**
+     * Display and manage the admin profile
+     *
+     * @return \Illuminate\Contracts\View\View
+     */
+    public function profile()
+    {
+        $user = Auth::user();
+        return view('admin.profile', compact('user'));
+    }
+    
+    /**
+     * Update the user profile
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = Auth::user();
+        
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
+            'phone' => 'nullable|string|max:15',
+            'bio' => 'nullable|string|max:1000',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+        
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar && Storage::exists('public/avatars/' . $user->avatar)) {
+                Storage::delete('public/avatars/' . $user->avatar);
+            }
+            
+            // Store new avatar
+            $avatarName = time() . '.' . $request->avatar->extension();
+            $request->avatar->storeAs('public/avatars', $avatarName);
+            $user->avatar = $avatarName;
+        }
+        
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->phone = $validated['phone'] ?? $user->phone;
+        $user->bio = $validated['bio'] ?? $user->bio;
+        $user->save();
+        
+        return redirect()->route('admin.profile')->with('success', 'Profile updated successfully!');
+    }
+    
+    /**
+     * Update the user password
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function updatePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+        
+        $user = Auth::user();
+        
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => 'The current password is incorrect.']);
+        }
+        
+        $user->password = Hash::make($validated['password']);
+        $user->save();
+        
+        return redirect()->route('admin.profile')->with('success', 'Password updated successfully!');
     }
 }

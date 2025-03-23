@@ -22,9 +22,6 @@ class HomeController extends Controller
      *
      * @return \Illuminate\Contracts\Support\Renderable|\Illuminate\Http\RedirectResponse
      */
-    public function index()
-    {
-       dd('Hello');
-    }
+  
     
 }

@@ -177,5 +177,8 @@ Route::post('/api/mpesa/callback', [MpesaController::class, 'handleCallback'])->
 Route::post('/api/mpesa/timeout', [MpesaController::class, 'handleTimeout'])->name('mpesa.timeout');
 Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name('mpesa.result');
 
+// Add this to your existing admin routes group
+Route::get('/writers/{writer}/edit', [App\Http\Controllers\Admin\WriterController::class, 'edit'])->name('admin.writers.edit');
+Route::put('/writers/{writer}', [App\Http\Controllers\Admin\WriterController::class, 'update'])->name('admin.writers.update');
 
 

@@ -492,4 +492,433 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                                <th scope
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse($writer->ordersAsWriter()->latest()->limit(5)->get() as $order)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        #{{ $order->id }}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                                        {{ $order->title }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span class="{{ now()->gt($order->deadline) ? 'text-red-600' : 'text-gray-600' }}">
+                                            {{ $order->deadline->format('M d, Y, g:i A') }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        @if(in_array($order->status, ['completed', 'paid', 'finished']))
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                {{ ucfirst($order->status) }}
+                                            </span>
+                                        @elseif(in_array($order->status, ['confirmed', 'in_progress', 'done', 'delivered']))
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                {{ ucfirst($order->status) }}
+                                            </span>
+                                        @elseif($order->status == 'revision')
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                Revision
+                                            </span>
+                                        @elseif($order->status == 'dispute')
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Dispute
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                {{ ucfirst($order->status) }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        ${{ number_format($order->price, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <a href="{{ route('admin.orders.show', $order->id) }}" class="text-primary-600 hover:text-primary-900">View</a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        No orders found for this writer.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Finances Tab Content -->
+        <div x-show="activeTab === 'finances'" class="space-y-6">
+            <!-- Financial Overview Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white shadow-sm rounded-lg overflow-hidden p-6">
+                    <h3 class="text-sm font-medium text-gray-500">Total Earnings</h3>
+                    <p class="mt-2 text-3xl font-bold text-gray-900">${{ number_format($stats['total_earnings'], 2) }}</p>
+                    <p class="mt-1 text-sm text-gray-500">Lifetime earnings from completed orders</p>
+                </div>
+                
+                <div class="bg-white shadow-sm rounded-lg overflow-hidden p-6">
+                    <h3 class="text-sm font-medium text-gray-500">Available Balance</h3>
+                    <p class="mt-2 text-3xl font-bold text-green-600">${{ number_format($stats['available_balance'], 2) }}</p>
+                    <p class="mt-1 text-sm text-gray-500">Amount available for withdrawal</p>
+                </div>
+                
+                <div class="bg-white shadow-sm rounded-lg overflow-hidden p-6">
+                    <h3 class="text-sm font-medium text-gray-500">Pending Withdrawals</h3>
+                    <p class="mt-2 text-3xl font-bold text-yellow-600">${{ number_format($stats['pending_withdrawals'], 2) }}</p>
+                    <p class="mt-1 text-sm text-gray-500">Withdrawal requests in process</p>
+                </div>
+            </div>
+            
+            <!-- Recent Transactions -->
+            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900">Recent Transactions</h3>
+                    <a href="{{ route('admin.finance.transactions', ['user_id' => $writer->id]) }}" class="text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View all
+                    </a>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse($writer->financialTransactions()->latest()->limit(5)->get() as $transaction)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ $transaction->created_at->format('M d, Y') }}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                                        {{ $transaction->description }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        @if($transaction->transaction_type == 'order_payment')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                Order Payment
+                                            </span>
+                                        @elseif($transaction->transaction_type == 'withdrawal')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                Withdrawal
+                                            </span>
+                                        @elseif($transaction->transaction_type == 'bonus')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                Bonus
+                                            </span>
+                                        @elseif($transaction->transaction_type == 'penalty')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                Penalty
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                {{ ucfirst($transaction->transaction_type) }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        @if($transaction->status == 'completed')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                Completed
+                                            </span>
+                                        @elseif($transaction->status == 'pending')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                Pending
+                                            </span>
+                                        @elseif($transaction->status == 'failed')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                Failed
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                {{ ucfirst($transaction->status) }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                                        @if(in_array($transaction->transaction_type, ['withdrawal', 'penalty']))
+                                            <span class="text-red-600">-${{ number_format($transaction->amount, 2) }}</span>
+                                        @else
+                                            <span class="text-green-600">+${{ number_format($transaction->amount, 2) }}</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        No transactions found for this writer.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Process Payment Section -->
+            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Process Payment</h3>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Bonus Payment -->
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="text-base font-medium text-gray-900 mb-2">Add Bonus</h4>
+                            <p class="text-sm text-gray-500 mb-4">Reward the writer with a bonus payment</p>
+                            
+                            <form action="{{ route('admin.finance.bonus.store') }}" method="POST" class="space-y-4">
+                                @csrf
+                                <input type="hidden" name="user_id" value="{{ $writer->id }}">
+                                
+                                <div>
+                                    <label for="bonus_amount" class="block text-sm font-medium text-gray-700">Amount ($)</label>
+                                    <input type="number" min="0.01" step="0.01" name="amount" id="bonus_amount" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" required>
+                                </div>
+                                
+                                <div>
+                                    <label for="bonus_description" class="block text-sm font-medium text-gray-700">Description</label>
+                                    <input type="text" name="description" id="bonus_description" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" required>
+                                </div>
+                                
+                                <div>
+                                    <button type="submit" class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                        Add Bonus
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Apply Penalty -->
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h4 class="text-base font-medium text-gray-900 mb-2">Apply Penalty</h4>
+                            <p class="text-sm text-gray-500 mb-4">Deduct funds for policy violations or quality issues</p>
+                            
+                            <form action="{{ route('admin.finance.penalty.store') }}" method="POST" class="space-y-4">
+                                @csrf
+                                <input type="hidden" name="user_id" value="{{ $writer->id }}">
+                                
+                                <div>
+                                    <label for="penalty_amount" class="block text-sm font-medium text-gray-700">Amount ($)</label>
+                                    <input type="number" min="0.01" step="0.01" name="amount" id="penalty_amount" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" required>
+                                </div>
+                                
+                                <div>
+                                    <label for="penalty_description" class="block text-sm font-medium text-gray-700">Reason</label>
+                                    <input type="text" name="description" id="penalty_description" class="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" required>
+                                </div>
+                                
+                                <div>
+                                    <button type="submit" class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                        Apply Penalty
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Activity Tab Content -->
+        <div x-show="activeTab === 'activity'" class="space-y-6">
+            <!-- Activity Timeline -->
+            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+                </div>
+                
+                <div class="p-6 relative">
+                    <!-- Timeline Line -->
+                    <div class="absolute top-6 bottom-0 left-12 md:left-14 w-px bg-gray-200"></div>
+                    
+                    <ul class="space-y-6">
+                        @forelse($recentActivity as $activity)
+                            <li class="relative pl-10 md:pl-12">
+                                <!-- Activity Dot -->
+                                <div class="absolute left-9 md:left-11 -translate-x-1/2 -translate-y-0 w-6 h-6 flex items-center justify-center rounded-full 
+                                    @if($activity['type'] == 'order')
+                                        bg-blue-100
+                                    @elseif($activity['type'] == 'transaction')
+                                        @if(in_array($activity['data']->transaction_type, ['withdrawal', 'penalty']))
+                                            bg-red-100
+                                        @else
+                                            bg-green-100
+                                        @endif
+                                    @else
+                                        bg-gray-100
+                                    @endif
+                                    z-10">
+                                    @if($activity['type'] == 'order')
+                                        <i class="fas fa-clipboard-list text-xs 
+                                            @if(in_array($activity['data']->status, ['completed', 'paid', 'finished']))
+                                                text-green-600
+                                            @elseif(in_array($activity['data']->status, ['confirmed', 'in_progress', 'done', 'delivered']))
+                                                text-blue-600
+                                            @elseif($activity['data']->status == 'revision')
+                                                text-yellow-600
+                                            @elseif($activity['data']->status == 'dispute')
+                                                text-red-600
+                                            @else
+                                                text-gray-600
+                                            @endif
+                                        "></i>
+                                    @elseif($activity['type'] == 'transaction')
+                                        @if($activity['data']->transaction_type == 'order_payment')
+                                            <i class="fas fa-money-bill-wave text-xs text-green-600"></i>
+                                        @elseif($activity['data']->transaction_type == 'withdrawal')
+                                            <i class="fas fa-money-bill-wave text-xs text-red-600"></i>
+                                        @elseif($activity['data']->transaction_type == 'bonus')
+                                            <i class="fas fa-gift text-xs text-green-600"></i>
+                                        @elseif($activity['data']->transaction_type == 'penalty')
+                                            <i class="fas fa-exclamation-triangle text-xs text-red-600"></i>
+                                        @else
+                                            <i class="fas fa-exchange-alt text-xs text-gray-600"></i>
+                                        @endif
+                                    @endif
+                                </div>
+                                
+                                <!-- Activity Content -->
+                                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h4 class="text-sm font-medium text-gray-900">
+                                                @if($activity['type'] == 'order')
+                                                    Order #{{ $activity['data']->id }} {{ ucfirst($activity['data']->status) }}
+                                                @elseif($activity['type'] == 'transaction')
+                                                    @if($activity['data']->transaction_type == 'order_payment')
+                                                        Payment Received
+                                                    @elseif($activity['data']->transaction_type == 'withdrawal')
+                                                        Withdrawal {{ ucfirst($activity['data']->status) }}
+                                                    @elseif($activity['data']->transaction_type == 'bonus')
+                                                        Bonus Payment
+                                                    @elseif($activity['data']->transaction_type == 'penalty')
+                                                        Penalty Applied
+                                                    @else
+                                                        {{ ucfirst($activity['data']->transaction_type) }}
+                                                    @endif
+                                                @endif
+                                            </h4>
+                                            <p class="text-xs text-gray-500">{{ $activity['date']->format('M d, Y, g:i A') }}</p>
+                                        </div>
+                                        
+                                        @if($activity['type'] == 'transaction')
+                                            <div class="text-sm font-medium 
+                                                @if(in_array($activity['data']->transaction_type, ['withdrawal', 'penalty']))
+                                                    text-red-600
+                                                @else
+                                                    text-green-600
+                                                @endif">
+                                                @if(in_array($activity['data']->transaction_type, ['withdrawal', 'penalty']))
+                                                    -${{ number_format($activity['data']->amount, 2) }}
+                                                @else
+                                                    +${{ number_format($activity['data']->amount, 2) }}
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
+                                    
+                                    <div class="mt-2">
+                                        @if($activity['type'] == 'order')
+                                            <p class="text-sm text-gray-600">{{ Str::limit($activity['data']->title, 100) }}</p>
+                                            <div class="mt-2 flex justify-between">
+                                                <span class="text-xs text-gray-500">Price: ${{ number_format($activity['data']->price, 2) }}</span>
+                                                <a href="{{ route('admin.orders.show', $activity['data']->id) }}" class="text-xs text-primary-600 hover:text-primary-900">View Details</a>
+                                            </div>
+                                        @elseif($activity['type'] == 'transaction')
+                                            <p class="text-sm text-gray-600">{{ $activity['data']->description }}</p>
+                                            @if($activity['data']->order_id)
+                                                <div class="mt-2 flex justify-between">
+                                                    <span class="text-xs text-gray-500">Related to Order #{{ $activity['data']->order_id }}</span>
+                                                    <a href="{{ route('admin.orders.show', $activity['data']->order_id) }}" class="text-xs text-primary-600 hover:text-primary-900">View Order</a>
+                                                </div>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </div>
+                            </li>
+                        @empty
+                            <li class="text-center py-4 text-gray-500">
+                                No recent activity found for this writer.
+                            </li>
+                        @endforelse
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Login History -->
+            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Login History</h3>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Browser</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- Replace with actual login history data if available -->
+                            @if(isset($loginHistory) && count($loginHistory) > 0)
+                                @foreach($loginHistory as $login)
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ $login->created_at->format('M d, Y, g:i A') }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ $login->ip_address }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ $login->device ?? 'Unknown' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ $login->browser ?? 'Unknown' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            @if($login->successful)
+                                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                    Successful
+                                                </span>
+                                            @else
+                                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                    Failed
+                                                </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @else
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        No login history available.
+                                    </td>
+                                </tr>
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endsection
