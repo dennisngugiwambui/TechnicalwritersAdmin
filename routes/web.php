@@ -64,6 +64,11 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
     Route::post('/orders/upload-files', [OrderController::class, 'uploadFiles'])->name('orders.upload-files');
 
+    Route::get('/admin/profile', [AdminHomeController::class, 'profile'])->name('admin.profile');
+    Route::put('/admin/profile/update', [AdminHomeController::class, 'updateProfile'])->name('admin.profile.update');
+    Route::put('/admin/profile/password', [HAdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
+});
+
 
     Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');
     Route::post('/settings/toggle-writer-debug', [SettingsController::class, 'toggleWriterDebug'])->name('settings.toggle-writer-debug');
