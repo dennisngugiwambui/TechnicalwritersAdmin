@@ -18,7 +18,7 @@
                         <i class="fas fa-search"></i>
                     </button>
                 </form>
-                <a href="{{ route('admin.orders.scrape') }}" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <a href="" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     <i class="fas fa-sync-alt mr-2"></i> Scrape Orders
                 </a>
             </div>

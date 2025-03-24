@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Model;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -276,11 +277,4 @@ class User extends Authenticatable
                     ]);
     }
 
-    /**
-     * Get ratings for this writer
-     */
-    public function ratings()
-    {
-        //return $this->hasMany(Rating::class, 'writer_id');
-    }
 }

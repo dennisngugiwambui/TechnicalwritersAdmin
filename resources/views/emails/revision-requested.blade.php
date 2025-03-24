@@ -37,6 +37,13 @@
             padding: 15px;
             margin-bottom: 20px;
         }
+        .order-details {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
         .button {
             display: inline-block;
             background-color: #ffc107;
@@ -63,9 +70,7 @@
         </div>
         
         <div class="content">
-            <p>Hello {{ $order->writer->name }},</p>
-            
-            <p>The client has requested a revision for Order #{{ $order->id }}. Please review the revision comments and make the necessary adjustments as soon as possible.</p>
+            {!! nl2br(e($emailBody)) !!}
             
             <div class="revision-details">
                 <h3>Revision Comments:</h3>
@@ -76,10 +81,8 @@
                 <p><strong>Order ID:</strong> #{{ $order->id }}</p>
                 <p><strong>Title:</strong> {{ $order->title }}</p>
                 <p><strong>Type of Service:</strong> {{ $order->type_of_service }}</p>
-                <p><strong>Deadline for Revision:</strong> {{ now()->addDays(1)->format('F j, Y, g:i a') }}</p>
+                <p><strong>Deadline for Revision:</strong> {{ $revisionDeadline }}</p>
             </div>
-            
-            <p>Please prioritize this revision and complete it within the next 24 hours.</p>
             
             <a href="{{ route('writer.orders.show', $order->id) }}" class="button">View Order & Revision Details</a>
         </div>

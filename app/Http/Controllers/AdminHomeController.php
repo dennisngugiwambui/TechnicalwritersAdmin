@@ -52,89 +52,87 @@ class AdminHomeController extends Controller
             return redirect()->route('failed');
         }
 
-          // Dashboard statistics
-          $availableOrdersCount = Order::where('status', Order::STATUS_AVAILABLE)->count();
+        // Dashboard statistics
+        $availableOrdersCount = Order::where('status', Order::STATUS_AVAILABLE)->count();
+    
+        $inProgressOrdersCount = Order::whereIn('status', [
+            Order::STATUS_CONFIRMED, 
+            Order::STATUS_IN_PROGRESS,
+            Order::STATUS_DONE,
+            Order::STATUS_DELIVERED
+        ])->count();
         
-          $inProgressOrdersCount = Order::whereIn('status', [
-              Order::STATUS_CONFIRMED, 
-              Order::STATUS_IN_PROGRESS,
-              Order::STATUS_DONE,
-              Order::STATUS_DELIVERED
-          ])->count();
-          
-          $completedOrdersCount = Order::whereIn('status', [
-              Order::STATUS_COMPLETED,
-              Order::STATUS_PAID,
-              Order::STATUS_FINISHED
-          ])->count();
-          
-          $activeWritersCount = User::where('usertype', User::ROLE_WRITER)
-              ->where('status', User::STATUS_ACTIVE)
-              ->count();
-          
-          // Get top writers by completed orders
-          $topWriters = User::where('usertype', User::ROLE_WRITER)
-              ->withCount(['ordersAsWriter as orders_count' => function($query) {
-                  $query->whereIn('status', [
-                      Order::STATUS_COMPLETED,
-                      Order::STATUS_PAID,
-                      Order::STATUS_FINISHED
-                  ]);
-              }])
-              ->orderByDesc('orders_count')
-              ->limit(5)
-              ->get();
-          
-          // Recent orders
-          $recentOrders = Order::with('writer')
-              ->latest()
-              ->limit(10)
-              ->get();
-          
-          // Orders requiring attention (revisions or approaching deadlines)
-          $attentionOrders = Order::where(function($query) {
-                  $query->where('status', Order::STATUS_REVISION)
-                      ->orWhere(function($q) {
-                          $q->where('status', Order::STATUS_IN_PROGRESS)
-                            ->where('deadline', '<=', Carbon::now()->addDays(1));
-                      });
-              })
-              ->orderBy('deadline')
-              ->limit(5)
-              ->get();
-          
-          // Pending payment requests
-          $pendingPayments = Finance::with('writer')
-              ->where('transaction_type', Finance::TYPE_WITHDRAWAL)
-              ->where('status', Finance::STATUS_PENDING)
-              ->latest()
-              ->limit(5)
-              ->get();
-          
-          // Prepare chart data
-          [$monthlyOrdersLabels, $monthlyAvailableData, $monthlyCompletedData] = $this->getMonthlyOrdersData();
-          [$disciplineLabels, $disciplineCounts] = $this->getOrdersByDisciplineData();
-          
-          return view('admin.index', compact(
-              'availableOrdersCount',
-              'inProgressOrdersCount',
-              'completedOrdersCount',
-              'activeWritersCount',
-              'topWriters',
-              'recentOrders',
-              'attentionOrders',
-              'pendingPayments',
-              'monthlyOrdersLabels',
-              'monthlyAvailableData',
-              'monthlyCompletedData',
-              'disciplineLabels',
-              'disciplineCounts'
-          ));
+        $completedOrdersCount = Order::whereIn('status', [
+            Order::STATUS_COMPLETED,
+            Order::STATUS_PAID,
+            Order::STATUS_FINISHED
+        ])->count();
         
+        $activeWritersCount = User::where('usertype', User::ROLE_WRITER)
+            ->where('status', User::STATUS_ACTIVE)
+            ->count();
         
+        // Get top writers by completed orders
+        $topWriters = User::where('usertype', User::ROLE_WRITER)
+            ->withCount(['ordersAsWriter as orders_count' => function($query) {
+                $query->whereIn('status', [
+                    Order::STATUS_COMPLETED,
+                    Order::STATUS_PAID,
+                    Order::STATUS_FINISHED
+                ]);
+            }])
+            ->orderByDesc('orders_count')
+            ->limit(5)
+            ->get();
+        
+        // Recent orders
+        $recentOrders = Order::with('writer')
+            ->latest()
+            ->limit(10)
+            ->get();
+        
+        // Orders requiring attention (revisions or approaching deadlines)
+        $attentionOrders = Order::where(function($query) {
+                $query->where('status', Order::STATUS_REVISION)
+                    ->orWhere(function($q) {
+                        $q->where('status', Order::STATUS_IN_PROGRESS)
+                        ->where('deadline', '<=', Carbon::now()->addDays(1));
+                    });
+            })
+            ->orderBy('deadline')
+            ->limit(5)
+            ->get();
+        
+        // Pending payment requests
+        $pendingPayments = Finance::with('user')
+            ->where('transaction_type', Finance::TYPE_WITHDRAWAL)
+            ->where('status', Finance::STATUS_PENDING)
+            ->latest()
+            ->limit(5)
+            ->get();
+        
+        // Prepare chart data
+        [$monthlyOrdersLabels, $monthlyAvailableData, $monthlyCompletedData] = $this->getMonthlyOrdersData();
+        [$disciplineLabels, $disciplineCounts] = $this->getOrdersByDisciplineData();
+        
+        return view('admin.index', compact(
+            'availableOrdersCount',
+            'inProgressOrdersCount',
+            'completedOrdersCount',
+            'activeWritersCount',
+            'topWriters',
+            'recentOrders',
+            'attentionOrders',
+            'pendingPayments',
+            'monthlyOrdersLabels',
+            'monthlyAvailableData',
+            'monthlyCompletedData',
+            'disciplineLabels',
+            'disciplineCounts'
+        ));
     }
 
-     /**
+    /**
      * Get chart data for AJAX requests
      *
      * @param  \Illuminate\Http\Request  $request
@@ -245,8 +243,6 @@ class AdminHomeController extends Controller
         
         return [$labels, $counts];
     }
-
-    // Your existing methods...
     
     /**
      * Display and manage the admin profile
@@ -274,26 +270,36 @@ class AdminHomeController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'phone' => 'nullable|string|max:15',
             'bio' => 'nullable|string|max:1000',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
         
-        if ($request->hasFile('avatar')) {
-            // Delete old avatar if exists
-            if ($user->avatar && Storage::exists('public/avatars/' . $user->avatar)) {
-                Storage::delete('public/avatars/' . $user->avatar);
+        if ($request->hasFile('profile_picture')) {
+            // Delete old profile picture if exists
+            if ($user->profile_picture && Storage::exists('public/profile_pictures/' . $user->profile_picture)) {
+                Storage::delete('public/profile_pictures/' . $user->profile_picture);
             }
             
-            // Store new avatar
-            $avatarName = time() . '.' . $request->avatar->extension();
-            $request->avatar->storeAs('public/avatars', $avatarName);
-            $user->avatar = $avatarName;
+            // Store new profile picture
+            $pictureName = time() . '.' . $request->profile_picture->extension();
+            $request->profile_picture->storeAs('public/profile_pictures', $pictureName);
+            $user->profile_picture = $pictureName;
         }
         
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->phone = $validated['phone'] ?? $user->phone;
         $user->bio = $validated['bio'] ?? $user->bio;
-        $user->save();
+        
+        // Update the user record
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update([
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'bio' => $user->bio,
+                'profile_picture' => $user->profile_picture
+            ]);
         
         return redirect()->route('admin.profile')->with('success', 'Profile updated successfully!');
     }
@@ -317,8 +323,12 @@ class AdminHomeController extends Controller
             return back()->withErrors(['current_password' => 'The current password is incorrect.']);
         }
         
-        $user->password = Hash::make($validated['password']);
-        $user->save();
+        // Update the password
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update([
+                'password' => Hash::make($validated['password'])
+            ]);
         
         return redirect()->route('admin.profile')->with('success', 'Password updated successfully!');
     }

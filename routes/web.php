@@ -12,6 +12,8 @@ use App\Http\Controllers\AdminHomeController;
 use App\Http\Controllers\Api\MpesaController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\FileController;
+// Update this line to match your actual controller location
+use App\Http\Controllers\Admin\AdminOrderController;
 
 // Public routes
 Route::get('/', function () {
@@ -68,8 +70,11 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::put('/admin/profile/update', [AdminHomeController::class, 'updateProfile'])->name('admin.profile.update');
     Route::put('/admin/profile/password', [AdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
 
-    
-
+     // Bids Management
+     Route::get('/bids', [AdminOrderController::class, 'bids'])->name('bids');
+     Route::get('/bids/{order}', [AdminOrderController::class, 'showBids'])->name('bids.show');
+     Route::get('/bids/{order}/filter-writers', [AdminOrderController::class, 'filterWriters'])->name('bids.filter-writers');
+     Route::get('/bids/{order}/assign/{writer}', [AdminOrderController::class, 'assignBid'])->name('bids.assign');
 
     Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');
     Route::post('/settings/toggle-writer-debug', [SettingsController::class, 'toggleWriterDebug'])->name('settings.toggle-writer-debug');
@@ -187,4 +192,8 @@ Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name
 Route::get('/writers/{writer}/edit', [App\Http\Controllers\Admin\WriterController::class, 'edit'])->name('admin.writers.edit');
 Route::put('/writers/{writer}', [App\Http\Controllers\Admin\WriterController::class, 'update'])->name('admin.writers.update');
 
-
+// Add this to your existing routes to protect writer order access
+Route::middleware(['auth', 'check.order.ownership'])->group(function () {
+    Route::get('/writer/orders/{order}', [AdminOrderController::class, 'show'])
+        ->name('writer.orders.show');
+});

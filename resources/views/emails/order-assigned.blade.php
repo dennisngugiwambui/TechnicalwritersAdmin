@@ -63,9 +63,7 @@
         </div>
         
         <div class="content">
-            <p>Hello {{ $order->writer->name }},</p>
-            
-            <p>This order has been assigned to you according to a customer's request. Take a moment to review all the instructions carefully, and please press 'Confirm' as soon as possible if you are going to accept this order.</p>
+            {!! nl2br(e($emailBody)) !!}
             
             <div class="order-details">
                 <p><strong>Order ID:</strong> #{{ $order->id }}</p>
@@ -76,10 +74,6 @@
                 <p><strong>Price:</strong> ${{ number_format($order->price, 2) }}</p>
                 <p><strong>Deadline:</strong> {{ $order->deadline->format('F j, Y, g:i a') }}</p>
             </div>
-            
-            <p>If you have any questions regarding clarification, feel free to contact the client. Just wait for their reply before starting to work on this order.</p>
-            
-            <p>Since the customer specifically asked for you to handle this order, it would be really appreciated if you could write an A+ paper.</p>
             
             <a href="{{ route('writer.orders.show', $order->id) }}" class="button">Check Order</a>
         </div>

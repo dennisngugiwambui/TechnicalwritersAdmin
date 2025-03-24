@@ -203,9 +203,13 @@
 
 
                 <!-- Bids -->
-                <a href="{{ route('admin.orders.bids') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.writers.*') ? 'active' : '' }}">
-                    <i class="fas fa-users w-5 h-5 mr-3"></i>
-                    <span>Writers</span>
+                <!-- Bids -->
+                <a href="{{ route('admin.bids') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.bids') || request()->routeIs('admin.bids.*') ? 'active' : '' }}">
+                    <i class="fas fa-gavel w-5 h-5 mr-3"></i>
+                    <span>Bids</span>
+                    @if(isset($pendingBidsCount) && $pendingBidsCount > 0)
+                    <span class="ml-auto bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ $pendingBidsCount }}</span>
+                    @endif
                 </a>
                 
                 <!-- Writers -->

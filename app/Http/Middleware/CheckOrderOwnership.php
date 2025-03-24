@@ -31,12 +31,12 @@ class CheckOrderOwnership
         $order = Order::findOrFail($orderId);
 
         // If the user is an admin, allow access
-        if (Auth::user()->isAdmin()) {
+        if (Auth::user()->usertype === 'admin') {
             return $next($request);
         }
 
         // If the user is a writer and assigned to this order
-        if (Auth::user()->isWriter() && $order->writer_id === Auth::id()) {
+        if (Auth::user()->usertype === 'writer' && $order->writer_id === Auth::id()) {
             return $next($request);
         }
 

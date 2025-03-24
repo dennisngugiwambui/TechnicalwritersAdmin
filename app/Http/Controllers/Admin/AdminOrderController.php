@@ -103,7 +103,7 @@ class AdminOrderController extends Controller
         return view('admin.bids.index', compact('orders', 'search'));
     }
 
-    /**
+        /**
      * Display the specified order with bids.
      *
      * @param  int  $id
@@ -116,8 +116,7 @@ class AdminOrderController extends Controller
                 $query->orderBy('created_at', 'desc');
             },
             'bids.writer' => function($query) {
-                $query->withCount('completedOrders as completed_count')
-                      ->withAvg('ratings as rating_avg', 'rating');
+                $query->with('writerProfile');
             },
             'files'
         ])->findOrFail($id);
@@ -148,12 +147,14 @@ class AdminOrderController extends Controller
             ->where(function($query) use ($searchTerm) {
                 $query->where('name', 'like', "%{$searchTerm}%")
                       ->orWhere('email', 'like', "%{$searchTerm}%")
-                      ->orWhere('id', 'like', "%{$searchTerm}%");
+                      ->orWhere('id', 'like', "%{$searchTerm}%")
+                      ->orWhereHas('writerProfile', function($q) use ($searchTerm) {
+                          $q->where('writer_id', 'like', "%{$searchTerm}%");
+                      });
             })
-            ->withCount('completedOrders as completed_count')
-            ->withAvg('ratings as rating_avg', 'rating')
-            ->orderBy('completed_count', 'desc')
-            ->orderBy('rating_avg', 'desc')
+            ->with('writerProfile') // Eager load the writer profile
+            ->orderBy('writerProfile.jobs_completed', 'desc')
+            ->orderBy('writerProfile.rating', 'desc')
             ->paginate(10);
         
         // Get bids for this order
@@ -166,7 +167,7 @@ class AdminOrderController extends Controller
             'bidders' => $bidders
         ]);
     }
-
+    
     /**
      * Show the form for creating a new order.
      *
