@@ -242,4 +242,45 @@ class User extends Authenticatable
     {
         return Finance::getUserTransactions($this->id, $limit);
     }
+
+        /**
+     * Check if user is an admin
+     *
+     * @return bool
+     */
+    public function isAdmin()
+    {
+        return $this->usertype === self::ROLE_ADMIN;
+    }
+
+    /**
+     * Check if user is a writer
+     *
+     * @return bool
+     */
+    public function isWriter()
+    {
+        return $this->usertype === self::ROLE_WRITER;
+    }
+
+    /**
+     * Get completed orders count
+     */
+    public function completedOrders()
+    {
+        return $this->hasMany(Order::class, 'writer_id')
+                    ->whereIn('status', [
+                        Order::STATUS_COMPLETED,
+                        Order::STATUS_PAID,
+                        Order::STATUS_FINISHED
+                    ]);
+    }
+
+    /**
+     * Get ratings for this writer
+     */
+    public function ratings()
+    {
+        //return $this->hasMany(Rating::class, 'writer_id');
+    }
 }
