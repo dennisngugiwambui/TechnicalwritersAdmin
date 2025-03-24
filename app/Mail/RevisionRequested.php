@@ -2,11 +2,10 @@
 
 namespace App\Mail;
 
+use App\Models\Order;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class RevisionRequested extends Mailable
@@ -14,40 +13,40 @@ class RevisionRequested extends Mailable
     use Queueable, SerializesModels;
 
     /**
-     * Create a new message instance.
-     */
-    public function __construct()
-    {
-        //
-    }
-
-    /**
-     * Get the message envelope.
-     */
-    public function envelope(): Envelope
-    {
-        return new Envelope(
-            subject: 'Revision Requested',
-        );
-    }
-
-    /**
-     * Get the message content definition.
-     */
-    public function content(): Content
-    {
-        return new Content(
-            view: 'view.name',
-        );
-    }
-
-    /**
-     * Get the attachments for the message.
+     * The order instance.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @var \App\Models\Order
      */
-    public function attachments(): array
+    public $order;
+
+    /**
+     * The revision comments.
+     *
+     * @var string
+     */
+    public $comments;
+
+    /**
+     * Create a new message instance.
+     *
+     * @param  \App\Models\Order  $order
+     * @param  string  $comments
+     * @return void
+     */
+    public function __construct(Order $order, $comments)
     {
-        return [];
+        $this->order = $order;
+        $this->comments = $comments;
+    }
+
+    /**
+     * Build the message.
+     *
+     * @return $this
+     */
+    public function build()
+    {
+        return $this->subject('Revision Requested for Order #' . $this->order->id)
+                    ->view('emails.revision-requested');
     }
 }

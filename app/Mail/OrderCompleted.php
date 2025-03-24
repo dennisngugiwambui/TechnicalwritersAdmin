@@ -2,11 +2,10 @@
 
 namespace App\Mail;
 
+use App\Models\Order;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class OrderCompleted extends Mailable
@@ -14,40 +13,31 @@ class OrderCompleted extends Mailable
     use Queueable, SerializesModels;
 
     /**
-     * Create a new message instance.
-     */
-    public function __construct()
-    {
-        //
-    }
-
-    /**
-     * Get the message envelope.
-     */
-    public function envelope(): Envelope
-    {
-        return new Envelope(
-            subject: 'Order Completed',
-        );
-    }
-
-    /**
-     * Get the message content definition.
-     */
-    public function content(): Content
-    {
-        return new Content(
-            view: 'view.name',
-        );
-    }
-
-    /**
-     * Get the attachments for the message.
+     * The order instance.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @var \App\Models\Order
      */
-    public function attachments(): array
+    public $order;
+
+    /**
+     * Create a new message instance.
+     *
+     * @param  \App\Models\Order  $order
+     * @return void
+     */
+    public function __construct(Order $order)
     {
-        return [];
+        $this->order = $order;
+    }
+
+    /**
+     * Build the message.
+     *
+     * @return $this
+     */
+    public function build()
+    {
+        return $this->subject('Order #' . $this->order->id . ' Completed')
+                    ->view('emails.order-completed');
     }
 }
