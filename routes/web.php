@@ -9,7 +9,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\MessageController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\AdminHomeController;
-use App\Http\Controllers\Api\MpesaController; // Changed from Admin to Api namespace
+use App\Http\Controllers\Api\MpesaController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\FileController;
 
@@ -66,8 +66,9 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
 
     Route::get('/admin/profile', [AdminHomeController::class, 'profile'])->name('admin.profile');
     Route::put('/admin/profile/update', [AdminHomeController::class, 'updateProfile'])->name('admin.profile.update');
-    Route::put('/admin/profile/password', [HAdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
-});
+    Route::put('/admin/profile/password', [AdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
+
+    
 
 
     Route::post('/settings/toggle-writer-maintenance', [SettingsController::class, 'toggleWriterMaintenance'])->name('settings.toggle-writer-maintenance');

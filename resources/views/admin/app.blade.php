@@ -197,6 +197,16 @@
                         </a>
                     </div>
                 </div>
+
+
+                
+
+
+                <!-- Bids -->
+                <a href="{{ route('admin.orders.bids') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.writers.*') ? 'active' : '' }}">
+                    <i class="fas fa-users w-5 h-5 mr-3"></i>
+                    <span>Writers</span>
+                </a>
                 
                 <!-- Writers -->
                 <a href="{{ route('admin.writers.index') }}" class="nav-item flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-primary-500 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.writers.*') ? 'active' : '' }}">

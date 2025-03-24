@@ -5,9 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\User;
+use App\Models\Bid;
 use App\Models\Finance;
 use App\Models\File;
 use App\Models\Message;
+use App\Mail\OrderAssigned;
+use App\Mail\RevisionRequested;
+use App\Mail\OrderCompleted;
+use App\Mail\OrderDisputed;
 use App\Services\OrderScrapingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +22,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 
-class OrderController extends Controller
+class AdminOrderController extends Controller
 {
     /**
      * Display a listing of the orders.
@@ -70,6 +75,96 @@ class OrderController extends Controller
             'assignedCount',
             'completedCount'
         ));
+    }
+
+    /**
+     * Display a listing of all available orders with bids.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bids(Request $request)
+    {
+        $search = $request->input('search');
+        
+        $query = Order::where('status', Order::STATUS_AVAILABLE)
+            ->with(['bids', 'bids.writer']);
+        
+        // Search by order ID or title
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%");
+            });
+        }
+        
+        $orders = $query->latest()->paginate(15);
+        
+        return view('admin.bids.index', compact('orders', 'search'));
+    }
+
+    /**
+     * Display the specified order with bids.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function showBids($id)
+    {
+        $order = Order::with([
+            'bids' => function($query) {
+                $query->orderBy('created_at', 'desc');
+            },
+            'bids.writer' => function($query) {
+                $query->withCount('completedOrders as completed_count')
+                      ->withAvg('ratings as rating_avg', 'rating');
+            },
+            'files'
+        ])->findOrFail($id);
+        
+        // Ensure order is available
+        if ($order->status !== Order::STATUS_AVAILABLE) {
+            return redirect()->route('admin.bids')
+                ->with('error', 'This order is no longer available for bidding.');
+        }
+        
+        return view('admin.bids.show', compact('order'));
+    }
+
+    /**
+     * Filter writers by search term for bidding.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $orderId
+     * @return \Illuminate\Http\Response
+     */
+    public function filterWriters(Request $request, $orderId)
+    {
+        $searchTerm = $request->input('search', '');
+        $order = Order::findOrFail($orderId);
+        
+        $writers = User::where('usertype', User::ROLE_WRITER)
+            ->where('status', User::STATUS_ACTIVE)
+            ->where(function($query) use ($searchTerm) {
+                $query->where('name', 'like', "%{$searchTerm}%")
+                      ->orWhere('email', 'like', "%{$searchTerm}%")
+                      ->orWhere('id', 'like', "%{$searchTerm}%");
+            })
+            ->withCount('completedOrders as completed_count')
+            ->withAvg('ratings as rating_avg', 'rating')
+            ->orderBy('completed_count', 'desc')
+            ->orderBy('rating_avg', 'desc')
+            ->paginate(10);
+        
+        // Get bids for this order
+        $bidders = Bid::where('order_id', $orderId)
+            ->pluck('writer_id')
+            ->toArray();
+        
+        return response()->json([
+            'writers' => $writers,
+            'bidders' => $bidders
+        ]);
     }
 
     /**
@@ -290,6 +385,57 @@ class OrderController extends Controller
     }
 
     /**
+     * Assign order to a writer from the bid page.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @param  int  $writerId
+     * @return \Illuminate\Http\Response
+     */
+    public function assignBid($id, $writerId)
+    {
+        $order = Order::findOrFail($id);
+        
+        // Check if order is available
+        if ($order->status !== Order::STATUS_AVAILABLE) {
+            return redirect()->route('admin.bids')
+                ->with('error', 'This order is no longer available for assignment.');
+        }
+        
+        // Check if writer exists and is active
+        $writer = User::where('id', $writerId)
+            ->where('usertype', User::ROLE_WRITER)
+            ->where('status', User::STATUS_ACTIVE)
+            ->first();
+            
+        if (!$writer) {
+            return redirect()->route('admin.bids.show', $id)
+                ->with('error', 'Selected writer is not available.');
+        }
+        
+        // Assign the order
+        $order->writer_id = $writerId;
+        $order->status = Order::STATUS_CONFIRMED;
+        $order->save();
+        
+        // Notify the writer via email
+        $this->notifyWriterOfAssignment($order);
+        
+        // Send auto message to the writer
+        $message = new Message();
+        $message->order_id = $order->id;
+        $message->user_id = Auth::id();
+        $message->receiver_id = $writerId;
+        $message->title = 'Order Assignment';
+        $message->message = 'This order has been assigned to you. Please review the details and begin working on it.';
+        $message->message_type = 'admin';
+        $message->save();
+        
+        return redirect()->route('admin.bids')
+            ->with('success', 'Order assigned successfully to writer #' . $writerId);
+    }
+
+    /**
      * Assign order to a writer.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -318,7 +464,8 @@ class OrderController extends Controller
             ->first();
             
         if (!$writer) {
-            return redirect()->back()->with('error', 'Selected writer is not available.');
+            return redirect()->back()
+                ->with('error', 'Selected writer is not available.');
         }
         
         // Assign the order
@@ -365,7 +512,8 @@ class OrderController extends Controller
         
         // Check if order can be revised
         if (!in_array($order->status, [Order::STATUS_DONE, Order::STATUS_DELIVERED])) {
-            return redirect()->back()->with('error', 'This order cannot be revised at this time.');
+            return redirect()->back()
+                ->with('error', 'This order cannot be revised at this time.');
         }
         
         // Update order status
@@ -400,7 +548,8 @@ class OrderController extends Controller
         
         // Check if order can be completed
         if (!in_array($order->status, [Order::STATUS_DONE, Order::STATUS_DELIVERED])) {
-            return redirect()->back()->with('error', 'This order cannot be marked as completed at this time.');
+            return redirect()->back()
+                ->with('error', 'This order cannot be marked as completed at this time.');
         }
         
         // Update order status
@@ -686,7 +835,7 @@ class OrderController extends Controller
         
         // Send email notification
         try {
-            Mail::to($order->writer->email)->send(new \App\Mail\OrderAssigned($order));
+            Mail::to($order->writer->email)->send(new OrderAssigned($order));
         } catch (\Exception $e) {
             Log::error('Failed to send order assignment email: ' . $e->getMessage());
         }
@@ -705,7 +854,7 @@ class OrderController extends Controller
         
         // Send email notification
         try {
-            Mail::to($order->writer->email)->send(new \App\Mail\RevisionRequested($order, $comments));
+            Mail::to($order->writer->email)->send(new RevisionRequested($order, $comments));
         } catch (\Exception $e) {
             Log::error('Failed to send revision request email: ' . $e->getMessage());
         }
@@ -723,7 +872,7 @@ class OrderController extends Controller
         
         // Send email notification
         try {
-            Mail::to($order->writer->email)->send(new \App\Mail\OrderCompleted($order));
+            Mail::to($order->writer->email)->send(new OrderCompleted($order));
         } catch (\Exception $e) {
             Log::error('Failed to send order completion email: ' . $e->getMessage());
         }
@@ -742,7 +891,7 @@ class OrderController extends Controller
         
         // Send email notification
         try {
-            Mail::to($order->writer->email)->send(new \App\Mail\OrderDisputed($order, $reason));
+            Mail::to($order->writer->email)->send(new OrderDisputed($order, $reason));
         } catch (\Exception $e) {
             Log::error('Failed to send order disputed email: ' . $e->getMessage());
         }

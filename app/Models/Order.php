@@ -2,6 +2,15 @@
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Payment;
+use App\Models\User;
+use App\Models\Bid;
+use App\Models\File;
+use App\Models\Message;
+use App\Models\Assessment;
+use App\Models\WriterPendingPayment;   
+use Illuminate\Container\Attributes\Auth;
+use Illuminate\Http\Request;
 class Order extends Model
 {
     protected $fillable = [
