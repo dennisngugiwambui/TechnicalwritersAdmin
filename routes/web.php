@@ -66,9 +66,6 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
     Route::post('/orders/upload-files', [OrderController::class, 'uploadFiles'])->name('orders.upload-files');
 
-    Route::get('/admin/profile', [AdminHomeController::class, 'profile'])->name('admin.profile');
-    Route::put('/admin/profile/update', [AdminHomeController::class, 'updateProfile'])->name('admin.profile.update');
-    Route::put('/admin/profile/password', [AdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
 
      // Bids Management
      Route::get('/bids', [AdminOrderController::class, 'bids'])->name('bids');
@@ -86,6 +83,12 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/writers/{writer}/activate', [WriterController::class, 'activate'])->name('writers.activate');
     Route::post('/writers/{writer}/verify', [WriterController::class, 'verify'])->name('writers.verify');
     Route::post('/writers/{writer}/reject', [WriterController::class, 'reject'])->name('writers.reject');
+
+     // Profile routes
+     
+     Route::put('/profile/update', [App\Http\Controllers\AdminHomeController::class, 'updateProfile'])->name('admin.profile.update');
+     Route::put('/profile/password', [App\Http\Controllers\AdminHomeController::class, 'updatePassword'])->name('admin.profile.password');
+     Route::post('/profile/logout-devices', [App\Http\Controllers\AdminHomeController::class, 'logoutOtherDevices'])->name('admin.profile.logout-devices');
     
     // Payment Management (Legacy routes)
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
@@ -162,7 +165,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::delete('/users/{id}', [SettingsController::class, 'destroyUser'])->name('users.destroy');
     
     // Profile routes
-    Route::get('/profile', [HomeController::class, 'profile'])->name('profile.show');
+    Route::get('/admin/profile', [AdminHomeController::class, 'profile'])->name('profile.show');
     Route::put('/profile', [HomeController::class, 'updateProfile'])->name('profile.update');
     Route::put('/profile/password', [HomeController::class, 'updatePassword'])->name('profile.password');
 });

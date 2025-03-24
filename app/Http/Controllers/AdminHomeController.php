@@ -244,6 +244,11 @@ class AdminHomeController extends Controller
         return [$labels, $counts];
     }
     
+  
+    
+    
+    
+
     /**
      * Display and manage the admin profile
      *
@@ -252,7 +257,30 @@ class AdminHomeController extends Controller
     public function profile()
     {
         $user = Auth::user();
-        return view('admin.profile', compact('user'));
+        
+        // Load recent admin activity
+        $recentActivities = \App\Models\AdminActivity::where('admin_id', $user->id)
+            ->latest()
+            ->limit(5)
+            ->get();
+            
+        // Get stats for the dashboard
+        $stats = [
+            'managed_writers' => User::where('usertype', User::ROLE_WRITER)->count(),
+            'completed_orders' => Order::whereIn('status', [
+                Order::STATUS_COMPLETED,
+                Order::STATUS_PAID,
+                Order::STATUS_FINISHED
+            ])->count(),
+            'pending_payments' => Finance::where('status', Finance::STATUS_PENDING)
+                ->where('transaction_type', Finance::TYPE_WITHDRAWAL)
+                ->count(),
+            'total_earnings' => Finance::where('transaction_type', Finance::TYPE_WITHDRAWAL)
+                ->where('status', Finance::STATUS_COMPLETED)
+                ->sum('amount'),
+        ];
+        
+        return view('admin.adminprofile', compact('user', 'recentActivities', 'stats'));
     }
     
     /**
@@ -270,38 +298,31 @@ class AdminHomeController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'phone' => 'nullable|string|max:15',
             'bio' => 'nullable|string|max:1000',
-            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
         
-        if ($request->hasFile('profile_picture')) {
-            // Delete old profile picture if exists
-            if ($user->profile_picture && Storage::exists('public/profile_pictures/' . $user->profile_picture)) {
-                Storage::delete('public/profile_pictures/' . $user->profile_picture);
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar && Storage::disk('public')->exists('avatars/' . $user->avatar)) {
+                Storage::disk('public')->delete('avatars/' . $user->avatar);
             }
             
-            // Store new profile picture
-            $pictureName = time() . '.' . $request->profile_picture->extension();
-            $request->profile_picture->storeAs('public/profile_pictures', $pictureName);
-            $user->profile_picture = $pictureName;
+            // Store new avatar
+            $avatarName = time() . '.' . $request->avatar->extension();
+            $request->avatar->storeAs('avatars', $avatarName, 'public');
+            $user->avatar = $avatarName;
         }
         
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->phone = $validated['phone'] ?? $user->phone;
         $user->bio = $validated['bio'] ?? $user->bio;
+        $user->save();
         
-        // Update the user record
-        DB::table('users')
-            ->where('id', $user->id)
-            ->update([
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'bio' => $user->bio,
-                'profile_picture' => $user->profile_picture
-            ]);
+        // Log the activity
+        $this->logAdminActivity('profile_updated', 'Updated profile information');
         
-        return redirect()->route('admin.profile')->with('success', 'Profile updated successfully!');
+        return redirect()->route('admin.profile.show')->with('success', 'Profile updated successfully!');
     }
     
     /**
@@ -323,13 +344,66 @@ class AdminHomeController extends Controller
             return back()->withErrors(['current_password' => 'The current password is incorrect.']);
         }
         
-        // Update the password
-        DB::table('users')
-            ->where('id', $user->id)
-            ->update([
-                'password' => Hash::make($validated['password'])
-            ]);
+        $user->password = Hash::make($validated['password']);
+        $user->save();
         
-        return redirect()->route('admin.profile')->with('success', 'Password updated successfully!');
+        // Log the activity
+        $this->logAdminActivity('password_updated', 'Updated account password');
+        
+        return redirect()->route('admin.profile.show')->with('success', 'Password updated successfully!');
+    }
+    
+    /**
+     * Log out from other browser sessions.
+     *
+     * @param  \Illuminate\Http\Request  $request//-
+     * @return \Illuminate\Http\RedirectResponse//-
+     * This function logs out the current admin user from all other browser sessions.//+
+
+     */
+    public function logoutOtherDevices(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+        ]);
+
+        $user = Auth::user();
+
+        // Check if password matches
+        if (!Hash::check($request->current_password, $user->password)) {
+            return redirect()->back()
+                ->withErrors(['current_password' => 'The password is incorrect.']);
+        }
+
+        // Log out from other devices
+        Auth::logoutOtherDevices($request->current_password);
+
+        // Log the activity
+        $this->logAdminActivity('devices_logged_out', 'Logged out from other devices');
+
+        return redirect()->route('admin.profile.show')
+            ->with('success', 'You have been logged out from other devices.');
+    }
+    
+    /**
+     * Log admin activity.
+     *
+     * @param  string  $action
+     * @param  string  $description
+     * @param  mixed   $target_id
+     * @param  string  $target_type
+     * @return void
+     */
+    private function logAdminActivity($action, $description, $target_id = null, $target_type = null)
+    {
+        \App\Models\AdminActivity::create([
+            'admin_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description,
+            'target_id' => $target_id,
+            'target_type' => $target_type,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
     }
 }
