@@ -16,7 +16,7 @@ class Bid extends Model
      */
     protected $fillable = [
         'order_id', 
-        'writer_id', 
+        'user_id', // This should be user_id, not writer_id
         'amount', 
         'delivery_time', 
         'note',
@@ -50,10 +50,18 @@ class Bid extends Model
     }
 
     /**
-     * Get the writer that made the bid.
+     * Get the user that made the bid (the writer).
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Alias for the user relationship to maintain backward compatibility.
      */
     public function writer()
     {
-        return $this->belongsTo(User::class, 'writer_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

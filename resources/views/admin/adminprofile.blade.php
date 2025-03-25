@@ -43,8 +43,8 @@
             <div class="bg-white rounded-xl shadow-lg overflow-hidden lg:col-span-1 transform transition-all duration-300 hover:shadow-xl">
                 <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-10 text-center">
                     <div class="relative inline-block">
-                        @if($user->avatar)
-                            <img class="h-32 w-32 rounded-full object-cover mx-auto ring-4 ring-white border-4 border-white shadow-inner" src="{{ asset('storage/avatars/' . $user->avatar) }}" alt="{{ $user->name }}">
+                        @if($user->profile_picture)
+                            <img class="h-32 w-32 rounded-full object-cover mx-auto ring-4 ring-white border-4 border-white shadow-inner" src="{{ asset('storage/avatars/' . $user->profile_picture) }}" alt="{{ $user->name }}">
                         @else
                             <div class="h-32 w-32 rounded-full bg-white flex items-center justify-center mx-auto ring-4 ring-white shadow-lg">
                                 <span class="text-4xl font-bold text-indigo-600">{{ substr($user->name, 0, 1) }}</span>
@@ -152,9 +152,9 @@
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <label class="block text-sm font-medium text-gray-700">Profile Photo</label>
                             <div class="mt-1 flex items-center">
-                                @if($user->avatar)
+                                @if($user->profile_picture)
                                     <div class="relative inline-block mr-3">
-                                        <img class="h-12 w-12 rounded-full object-cover border border-gray-200" src="{{ asset('storage/avatars/' . $user->avatar) }}" alt="{{ $user->name }}">
+                                        <img class="h-12 w-12 rounded-full object-cover border border-gray-200" src="{{ asset('storage/avatars/' . $user->profile_picture) }}" alt="{{ $user->name }}">
                                     </div>
                                 @else
                                     <div class="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mr-3 text-indigo-700">
@@ -168,7 +168,7 @@
                                         <i class="fas fa-upload mr-2 text-indigo-600"></i> Select Photo
                                         <input id="avatar" name="avatar" type="file" class="sr-only" accept="image/jpeg,image/png,image/jpg">
                                     </label>
-                                    @if($user->avatar)
+                                    @if($user->profile_picture)
                                     <button type="button" class="ml-2 bg-red-50 py-2 px-3 border border-red-300 rounded-md shadow-sm text-sm leading-4 font-medium text-red-700 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
@@ -333,7 +333,7 @@
                     </h3>
                 </div>
                 <div class="p-6">
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 stats-section">
                         <!-- Managed Writers -->
                         <div class="bg-white overflow-hidden shadow-md rounded-xl border border-indigo-100 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1">
                             <div class="p-5">

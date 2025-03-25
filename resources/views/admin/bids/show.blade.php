@@ -48,7 +48,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Task Size:</span>
-                        <span class="text-gray-800">{{ $order->task_size }} pages</span>
+                        <span class="text-gray-800">{{ $order->task_size ?? 'N/A' }} pages</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Deadline:</span>
@@ -122,33 +122,39 @@
                 <div class="flex-1">
                     <div class="flex items-center">
                         <div class="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-semibold mr-3">
-                            {{ strtoupper(substr($bid->writer->name, 0, 1)) }}
+                            {{ $bid->user && $bid->user->name ? strtoupper(substr($bid->user->name, 0, 1)) : '?' }}
                         </div>
                         <div>
-                            <h3 class="text-lg font-medium text-gray-900">{{ $bid->writer->name }}</h3>
-                            <p class="text-sm text-gray-500">Writer ID: {{ $bid->writer->writerProfile ? $bid->writer->writerProfile->writer_id : '#' . $bid->writer->id }}</p>
+                            <h3 class="text-lg font-medium text-gray-900">{{ $bid->user->name ?? 'Unknown Writer' }}</h3>
+                            <p class="text-sm text-gray-500">Writer ID: {{ $bid->user && $bid->user->writerProfile ? $bid->user->writerProfile->writer_id : '#' . ($bid->user_id ?? 'N/A') }}</p>
                         </div>
                     </div>
                     
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         <div>
                             <span class="text-sm text-gray-500">Completed Orders</span>
-                            <p class="text-lg font-medium text-gray-900">{{ $bid->writer->writerProfile ? $bid->writer->writerProfile->jobs_completed : $bid->writer->ordersAsWriter()->finished()->count() }}</p>
+                            <p class="text-lg font-medium text-gray-900">
+                                @if($bid->user && $bid->user->writerProfile)
+                                    {{ $bid->user->writerProfile->jobs_completed ?? 0 }}
+                                @else
+                                    {{ $bid->user ? $bid->user->ordersAsWriter()->whereIn('status', ['completed', 'paid', 'finished'])->count() : 0 }}
+                                @endif
+                            </p>
                         </div>
                         <div>
                             <span class="text-sm text-gray-500">Rating</span>
                             <p class="text-lg font-medium text-gray-900">
-                                @if($bid->writer->writerProfile && $bid->writer->writerProfile->rating)
-                                    <span class="text-yellow-500">
+                                @if($bid->user && $bid->user->writerProfile && isset($bid->user->writerProfile->rating))
+                                    <span <span class="text-yellow-500">
                                         @for($i = 1; $i <= 5; $i++)
-                                            @if($i <= round($bid->writer->writerProfile->rating))
+                                            @if($i <= round($bid->user->writerProfile->rating))
                                                 <i class="fas fa-star"></i>
                                             @else
                                                 <i class="far fa-star"></i>
                                             @endif
                                         @endfor
                                     </span>
-                                    <span class="text-gray-700 ml-1">{{ number_format($bid->writer->writerProfile->rating, 1) }}</span>
+                                    <span class="text-gray-700 ml-1">{{ number_format($bid->user->writerProfile->rating, 1) }}</span>
                                 @else
                                     <span class="text-gray-400">No ratings</span>
                                 @endif
@@ -160,22 +166,26 @@
                         </div>
                     </div>
                     
-                    @if($bid->note)
+                    @if($bid->cover_letter)
                     <div class="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-                        <p class="text-sm text-gray-700">{{ $bid->note }}</p>
+                        <p class="text-sm text-gray-700">{{ $bid->cover_letter }}</p>
                     </div>
                     @endif
                 </div>
                 
                 <div class="mt-6 md:mt-0 md:ml-6 flex flex-col items-end">
-                    <a href="{{ route('admin.writers.show', $bid->writer->id) }}" class="text-primary-600 hover:text-primary-900 mb-3">
+                    @if($bid->user)
+                    <a href="{{ route('admin.writers.show', $bid->user_id) }}" class="text-primary-600 hover:text-primary-900 mb-3">
                         <i class="fas fa-user mr-1"></i> View Profile
                     </a>
-                    <a href="{{ route('admin.bids.assign', [$order->id, $bid->writer->id]) }}" 
-                       onclick="return confirm('Are you sure you want to assign this order to {{ $bid->writer->name }}?')"
+                    <a href="{{ route('admin.bids.assign', [$order->id, $bid->user_id]) }}" 
+                       onclick="return confirm('Are you sure you want to assign this order to {{ $bid->user->name ?? 'this writer' }}?')"
                        class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                         <i class="fas fa-check mr-1"></i> Assign Order
                     </a>
+                    @else
+                    <span class="text-gray-400">Writer account unavailable</span>
+                    @endif
                 </div>
             </div>
         </div>
@@ -311,10 +321,10 @@
                             <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                                 <div class="flex items-center">
                                     <div class="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-semibold mr-3">
-                                        ${writer.name.charAt(0).toUpperCase()}
+                                        ${writer.name ? writer.name.charAt(0).toUpperCase() : '?'}
                                     </div>
                                     <div>
-                                        <h3 class="text-lg font-medium text-gray-900">${writer.name}</h3>
+                                        <h3 class="text-lg font-medium text-gray-900">${writer.name || 'Unknown Writer'}</h3>
                                         <p class="text-sm text-gray-500">Writer ID: ${writerProfile ? writerProfile.writer_id : '#' + writer.id}</p>
                                     </div>
                                 </div>
@@ -322,7 +332,7 @@
                                 <div class="mt-4 md:mt-0 grid grid-cols-2 gap-4">
                                     <div>
                                         <span class="text-sm text-gray-500">Completed</span>
-                                        <p class="text-lg font-medium text-gray-900">${writerProfile ? writerProfile.jobs_completed : 0}</p>
+                                        <p class="text-lg font-medium text-gray-900">${writerProfile ? writerProfile.jobs_completed || 0 : 0}</p>
                                     </div>
                                     <div>
                                         <span class="text-sm text-gray-500">Rating</span>
@@ -340,7 +350,7 @@
                                     </a>
                                     ${isBidder ? 
                                         `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-md">Has Bid</span>` : 
-                                        `<a href="${assignUrl}" onclick="return confirm('Are you sure you want to assign this order to ${writer.name}?')" class="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none">
+                                        `<a href="${assignUrl}" onclick="return confirm('Are you sure you want to assign this order to ${writer.name || 'this writer'}?')" class="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none">
                                             <i class="fas fa-check mr-1"></i> Assign
                                         </a>`
                                     }

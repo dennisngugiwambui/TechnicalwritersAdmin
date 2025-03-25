@@ -302,15 +302,15 @@ class AdminHomeController extends Controller
         ]);
         
         if ($request->hasFile('avatar')) {
-            // Delete old avatar if exists
-            if ($user->avatar && Storage::disk('public')->exists('avatars/' . $user->avatar)) {
-                Storage::disk('public')->delete('avatars/' . $user->avatar);
+            // Delete old profile picture if exists
+            if ($user->profile_picture && Storage::disk('public')->exists('avatars/' . $user->profile_picture)) {
+                Storage::disk('public')->delete('avatars/' . $user->profile_picture);
             }
             
-            // Store new avatar
+            // Store new profile picture
             $avatarName = time() . '.' . $request->avatar->extension();
             $request->avatar->storeAs('avatars', $avatarName, 'public');
-            $user->avatar = $avatarName;
+            $user->profile_picture = $avatarName; // FIXED: Use profile_picture instead of avatar
         }
         
         $user->name = $validated['name'];

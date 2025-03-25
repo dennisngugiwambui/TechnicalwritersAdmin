@@ -88,7 +88,7 @@ class AdminOrderController extends Controller
         $search = $request->input('search');
         
         $query = Order::where('status', Order::STATUS_AVAILABLE)
-            ->with(['bids', 'bids.writer']);
+            ->with(['bids', 'bids.user']); 
         
         // Search by order ID or title
         if ($search) {
@@ -103,7 +103,7 @@ class AdminOrderController extends Controller
         return view('admin.bids.index', compact('orders', 'search'));
     }
 
-        /**
+    /**
      * Display the specified order with bids.
      *
      * @param  int  $id
@@ -115,9 +115,8 @@ class AdminOrderController extends Controller
             'bids' => function($query) {
                 $query->orderBy('created_at', 'desc');
             },
-            'bids.writer' => function($query) {
-                $query->with('writerProfile');
-            },
+            'bids.user', // Changed from bids.writer to bids.user
+            'bids.user.writerProfile', // Eager load writer profiles
             'files'
         ])->findOrFail($id);
         
@@ -142,8 +141,8 @@ class AdminOrderController extends Controller
         $searchTerm = $request->input('search', '');
         $order = Order::findOrFail($orderId);
         
-        $writers = User::where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
+        $writers = User::where('usertype', 'writer')
+            ->where('status', 'active')
             ->where(function($query) use ($searchTerm) {
                 $query->where('name', 'like', "%{$searchTerm}%")
                       ->orWhere('email', 'like', "%{$searchTerm}%")
@@ -153,13 +152,12 @@ class AdminOrderController extends Controller
                       });
             })
             ->with('writerProfile') // Eager load the writer profile
-            ->orderBy('writerProfile.jobs_completed', 'desc')
-            ->orderBy('writerProfile.rating', 'desc')
+            ->orderBy('created_at', 'desc') // Fallback sort
             ->paginate(10);
         
         // Get bids for this order
         $bidders = Bid::where('order_id', $orderId)
-            ->pluck('writer_id')
+            ->pluck('user_id') // Changed from writer_id to user_id
             ->toArray();
         
         return response()->json([
@@ -175,8 +173,8 @@ class AdminOrderController extends Controller
      */
     public function create()
     {
-        $writers = User::where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
+        $writers = User::where('usertype', 'writer')
+            ->where('status', 'active')
             ->orderBy('name')
             ->get();
             
@@ -231,7 +229,7 @@ class AdminOrderController extends Controller
         // Handle file uploads
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
-                $path = $file->store('order_files');
+                $path = $file->store('order_files', 'public');
                 
                 $orderFile = new File();
                 $orderFile->name = $file->getClientOriginalName();
@@ -264,8 +262,8 @@ class AdminOrderController extends Controller
         $order = Order::with(['writer', 'files'])->findOrFail($id);
         
         // Get all available writers for assignment
-        $availableWriters = User::where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
+        $availableWriters = User::where('usertype', 'writer')
+            ->where('status', 'active')
             ->orderBy('name')
             ->get();
             
@@ -299,8 +297,8 @@ class AdminOrderController extends Controller
     {
         $order = Order::findOrFail($id);
         
-        $writers = User::where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
+        $writers = User::where('usertype', 'writer')
+            ->where('status', 'active')
             ->orderBy('name')
             ->get();
             
@@ -388,52 +386,66 @@ class AdminOrderController extends Controller
     /**
      * Assign order to a writer from the bid page.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param  int  $orderId
      * @param  int  $writerId
      * @return \Illuminate\Http\Response
      */
-    public function assignBid($id, $writerId)
+    public function assignBid($orderId, $writerId)
     {
-        $order = Order::findOrFail($id);
-        
-        // Check if order is available
-        if ($order->status !== Order::STATUS_AVAILABLE) {
-            return redirect()->route('admin.bids')
-                ->with('error', 'This order is no longer available for assignment.');
-        }
-        
-        // Check if writer exists and is active
-        $writer = User::where('id', $writerId)
-            ->where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
-            ->first();
+        try {
+            $order = Order::findOrFail($orderId);
+            $writer = User::where('usertype', 'writer')->findOrFail($writerId);
             
-        if (!$writer) {
-            return redirect()->route('admin.bids.show', $id)
-                ->with('error', 'Selected writer is not available.');
+            // Ensure order is available
+            if ($order->status !== Order::STATUS_AVAILABLE) {
+                return redirect()->route('admin.bids')
+                    ->with('error', 'This order is no longer available for assignment.');
+            }
+            
+            // Update order status and assign writer
+            $order->status = Order::STATUS_CONFIRMED;
+            $order->writer_id = $writerId;
+            $order->save();
+            
+            // If there's a bid from this writer, mark it as accepted
+            $bid = Bid::where('order_id', $orderId)
+                ->where('user_id', $writerId) // Changed from writer_id to user_id
+                ->first();
+                
+            if ($bid) {
+                $bid->status = Bid::STATUS_ACCEPTED;
+                $bid->save();
+            }
+            
+            // Reject all other bids
+            Bid::where('order_id', $orderId)
+                ->where('user_id', '!=', $writerId) // Changed from writer_id to user_id
+                ->update(['status' => Bid::STATUS_REJECTED]);
+                // Create system message
+            Message::create([
+                'order_id' => $orderId,
+                'user_id' => Auth::id(), // Admin sending the message
+                'receiver_id' => $writerId,
+                'message' => "You have been assigned to this order. Please review the details and start working.",
+                'message_type' => 'system',
+                'title' => 'Order Assignment'
+            ]);
+            
+            // Notify writer
+            $this->notifyWriterOfAssignment($order);
+            
+            return redirect()->route('admin.orders.show', $order->id)
+                ->with('toast', [
+                    'title' => 'Order Assigned',
+                    'message' => 'Order has been successfully assigned to ' . $writer->name
+                ]);
+                
+        } catch (\Exception $e) {
+            Log::error('Error assigning order: ' . $e->getMessage());
+            
+            return redirect()->route('admin.bids')
+                ->with('error', 'An error occurred while assigning the order: ' . $e->getMessage());
         }
-        
-        // Assign the order
-        $order->writer_id = $writerId;
-        $order->status = Order::STATUS_CONFIRMED;
-        $order->save();
-        
-        // Notify the writer via email
-        $this->notifyWriterOfAssignment($order);
-        
-        // Send auto message to the writer
-        $message = new Message();
-        $message->order_id = $order->id;
-        $message->user_id = Auth::id();
-        $message->receiver_id = $writerId;
-        $message->title = 'Order Assignment';
-        $message->message = 'This order has been assigned to you. Please review the details and begin working on it.';
-        $message->message_type = 'admin';
-        $message->save();
-        
-        return redirect()->route('admin.bids')
-            ->with('success', 'Order assigned successfully to writer #' . $writerId);
     }
 
     /**
@@ -460,8 +472,8 @@ class AdminOrderController extends Controller
         
         // Check if writer exists and is active
         $writer = User::where('id', $writerId)
-            ->where('usertype', User::ROLE_WRITER)
-            ->where('status', User::STATUS_ACTIVE)
+            ->where('usertype', 'writer')
+            ->where('status', 'active')
             ->first();
             
         if (!$writer) {
@@ -473,6 +485,21 @@ class AdminOrderController extends Controller
         $order->writer_id = $writerId;
         $order->status = Order::STATUS_CONFIRMED;
         $order->save();
+        
+        // If there's a bid from this writer, mark it as accepted
+        $bid = Bid::where('order_id', $id)
+            ->where('user_id', $writerId) // Changed from writer_id to user_id
+            ->first();
+            
+        if ($bid) {
+            $bid->status = Bid::STATUS_ACCEPTED;
+            $bid->save();
+            
+            // Reject all other bids
+            Bid::where('order_id', $id)
+                ->where('user_id', '!=', $writerId) // Changed from writer_id to user_id
+                ->update(['status' => Bid::STATUS_REJECTED]);
+        }
         
         // Notify the writer
         $this->notifyWriterOfAssignment($order);
@@ -558,7 +585,20 @@ class AdminOrderController extends Controller
         $order->save();
         
         // Process payment to writer
-        $order->processWriterPayment(Auth::id());
+        if (method_exists($order, 'processWriterPayment')) {
+            $order->processWriterPayment(Auth::id());
+        } else {
+            // Fallback if method doesn't exist
+            Finance::create([
+                'order_id' => $order->id,
+                'user_id' => $order->writer_id,
+                'amount' => $order->price * 0.7, // 70% of order price to writer
+                'transaction_type' => 'writer_payment',
+                'status' => 'completed',
+                'description' => 'Payment for completed order #' . $order->id,
+                'processor_id' => Auth::id()
+            ]);
+        }
         
         // Add completion message
         $message = new Message();
@@ -815,86 +855,87 @@ class AdminOrderController extends Controller
             } else {
                 return redirect()->route('admin.orders.index')
                     ->with('error', 'Error scraping orders: ' . $result['message']);
+                }
+            } catch (\Exception $e) {
+                Log::error('Order scraping error: ' . $e->getMessage());
+                
+                return redirect()->route('admin.orders.index')
+                    ->with('error', 'Error scraping orders: ' . $e->getMessage());
             }
-        } catch (\Exception $e) {
-            Log::error('Order scraping error: ' . $e->getMessage());
+        }
+    
+        /**
+         * Notify writer of order assignment.
+         *
+         * @param  \App\Models\Order  $order
+         * @return void
+         */
+        protected function notifyWriterOfAssignment($order)
+        {
+            if (!$order->writer) return;
             
-            return redirect()->route('admin.orders.index')
-                ->with('error', 'Error scraping orders: ' . $e->getMessage());
+            // Send email notification
+            try {
+                Mail::to($order->writer->email)->send(new OrderAssigned($order));
+            } catch (\Exception $e) {
+                Log::error('Failed to send order assignment email: ' . $e->getMessage());
+            }
+        }
+    
+        /**
+         * Notify writer of revision request.
+         *
+         * @param  \App\Models\Order  $order
+         * @param  string  $comments
+         * @return void
+         */
+        protected function notifyWriterOfRevision($order, $comments)
+        {
+            if (!$order->writer) return;
+            
+            // Send email notification
+            try {
+                Mail::to($order->writer->email)->send(new RevisionRequested($order, $comments));
+            } catch (\Exception $e) {
+                Log::error('Failed to send revision request email: ' . $e->getMessage());
+            }
+        }
+    
+        /**
+         * Notify writer of order completion.
+         *
+         * @param  \App\Models\Order  $order
+         * @return void
+         */
+        protected function notifyWriterOfCompletion($order)
+        {
+            if (!$order->writer) return;
+            
+            // Send email notification
+            try {
+                Mail::to($order->writer->email)->send(new OrderCompleted($order));
+            } catch (\Exception $e) {
+                Log::error('Failed to send order completion email: ' . $e->getMessage());
+            }
+        }
+    
+        /**
+         * Notify writer of order dispute.
+         *
+         * @param  \App\Models\Order  $order
+         * @param  string  $reason
+         * @return void
+         */
+        protected function notifyWriterOfDispute($order, $reason)
+        {
+            if (!$order->writer) return;
+            
+            // Send email notification
+            try {
+                Mail::to($order->writer->email)->send(new OrderDisputed($order, $reason));
+            } catch (\Exception $e) {
+                Log::error('Failed to send order disputed email: ' . $e->getMessage());
+            }
         }
     }
 
-    /**
-     * Notify writer of order assignment.
-     *
-     * @param  \App\Models\Order  $order
-     * @return void
-     */
-    protected function notifyWriterOfAssignment($order)
-    {
-        if (!$order->writer) return;
-        
-        // Send email notification
-        try {
-            Mail::to($order->writer->email)->send(new OrderAssigned($order));
-        } catch (\Exception $e) {
-            Log::error('Failed to send order assignment email: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Notify writer of revision request.
-     *
-     * @param  \App\Models\Order  $order
-     * @param  string  $comments
-     * @return void
-     */
-    protected function notifyWriterOfRevision($order, $comments)
-    {
-        if (!$order->writer) return;
-        
-        // Send email notification
-        try {
-            Mail::to($order->writer->email)->send(new RevisionRequested($order, $comments));
-        } catch (\Exception $e) {
-            Log::error('Failed to send revision request email: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Notify writer of order completion.
-     *
-     * @param  \App\Models\Order  $order
-     * @return void
-     */
-    protected function notifyWriterOfCompletion($order)
-    {
-        if (!$order->writer) return;
-        
-        // Send email notification
-        try {
-            Mail::to($order->writer->email)->send(new OrderCompleted($order));
-        } catch (\Exception $e) {
-            Log::error('Failed to send order completion email: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Notify writer of order dispute.
-     *
-     * @param  \App\Models\Order  $order
-     * @param  string  $reason
-     * @return void
-     */
-    protected function notifyWriterOfDispute($order, $reason)
-    {
-        if (!$order->writer) return;
-        
-        // Send email notification
-        try {
-            Mail::to($order->writer->email)->send(new OrderDisputed($order, $reason));
-        } catch (\Exception $e) {
-            Log::error('Failed to send order disputed email: ' . $e->getMessage());
-        }
-    }
-}
