@@ -38,7 +38,7 @@ class OrderAssigned extends Mailable
      */
     public function envelope(): Envelope
     {
-        $subject = Cache::get('email_template_order_assignment_subject', 'New Order Assignment: [Order_ID] - [Order_Title]');
+        $subject = Cache::get('email_template_order_assignment_subject', 'New Order Assignment: #[Order_ID] - [Order_Title]');
         
         // Replace placeholders
         $subject = $this->replacePlaceholders($subject);
@@ -107,7 +107,7 @@ Technical Writers Team");
     protected function replacePlaceholders($content)
     {
         $writerName = $this->order->writer ? $this->order->writer->name : 'Writer';
-        $writerDashboardUrl = route('writer.orders.show', $this->order->id);
+        $writerDashboardUrl = route('home');
         $orderDeadline = $this->order->deadline ? $this->order->deadline->format('F j, Y, g:i a') : 'Not specified';
         
         $replacements = [

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class AdminOrderController extends Controller
@@ -219,7 +220,7 @@ class AdminOrderController extends Controller
         // If writer is assigned immediately
         if ($request->input('writer_id')) {
             $order->writer_id = $request->input('writer_id');
-            $order->status = Order::STATUS_CONFIRMED;
+            $order->status = Order::STATUS_UNCONFIRMED; // Changed to UNCONFIRMED
         } else {
             $order->status = Order::STATUS_AVAILABLE;
         }
@@ -383,7 +384,113 @@ class AdminOrderController extends Controller
         return redirect()->back()->with('error', 'Order cannot be made available.');
     }
 
+     /**
+     * Assign order to a writer.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function assign(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'writer_id' => 'required|exists:users,id',
+        ]);
+        
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
+        try {
+            $order = Order::findOrFail($id);
+            $writerId = $request->input('writer_id');
+            
+            // Check if writer exists and is active
+            $writer = User::where('id', $writerId)
+                ->where('usertype', 'writer')
+                ->where('status', 'active')
+                ->first();
+                
+            if (!$writer) {
+                return redirect()->back()
+                    ->with('error', 'Selected writer is not available.');
+            }
+            
+            // Assign the order
+            $order->writer_id = $writerId;
+            $order->status = Order::STATUS_UNCONFIRMED; // Changed to UNCONFIRMED
+            $order->save();
+            
+            // If there's a bid from this writer, handle it safely
+            $bid = Bid::where('order_id', $id)
+                ->where('user_id', $writerId)
+                ->first();
+                
+            if ($bid) {
+                // Check if status column exists before trying to update it
+                if (Schema::hasColumn('bids', 'status')) {
+                    $bid->status = 'accepted';
+                    $bid->save();
+                    
+                    // Reject all other bids if status column exists
+                    Bid::where('order_id', $id)
+                        ->where('user_id', '!=', $writerId)
+                        ->update(['status' => 'rejected']);
+                }
+            }
+            
+            // Notify the writer via email
+            try {
+                Mail::to($writer->email)->send(new OrderAssigned($order));
+                Log::info('Assignment email sent for order #' . $order->id . ' to writer ' . $writer->name);
+            } catch (\Exception $e) {
+                Log::error('Failed to send order assignment email: ' . $e->getMessage());
+            }
+            
+            // Record admin message about assignment with action buttons
+            $message = new Message();
+            $message->order_id = $order->id;
+            $message->user_id = Auth::id();
+            $message->receiver_id = $writerId;
+            $message->title = 'Order Assignment';
+            $message->message = "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
+                <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
+                <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
+                <div class='flex space-x-3'>
+                    <a href='".route('writer.confirm.assignment', $order->id)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
+                    <a href='".route('writer.reject.assignment', $order->id)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
+                </div>
+            </div>";
+            $message->message_type = 'admin';
+            $message->requires_action = true;
+            $message->is_general = false;
+            $message->save();
+            
+            // Use toast notification
+            return redirect()->back()->with('toast', [
+                'title' => 'Order Assigned',
+                'message' => 'Order has been assigned to ' . $writer->name . '. Waiting for writer confirmation.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error assigning order: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
+            
+            return redirect()->back()
+                ->with('error', 'An error occurred while assigning the order: ' . $e->getMessage());
+        }
+    }
+
     /**
+     * Assign order to a writer from the bid page.
+     *
+     * @param  int  $orderId
+     * @param  int  $writerId
+     * @return \Illuminate\Http\Response
+     */
+
+    
+   /**
      * Assign order to a writer from the bid page.
      *
      * @param  int  $orderId
@@ -403,118 +510,173 @@ class AdminOrderController extends Controller
             }
             
             // Update order status and assign writer
-            $order->status = Order::STATUS_CONFIRMED;
+            $order->status = Order::STATUS_UNCONFIRMED; // Changed to UNCONFIRMED
             $order->writer_id = $writerId;
             $order->save();
             
-            // If there's a bid from this writer, mark it as accepted
+            // If there's a bid from this writer, update it without using 'status' column
             $bid = Bid::where('order_id', $orderId)
-                ->where('user_id', $writerId) // Changed from writer_id to user_id
+                ->where('user_id', $writerId)
                 ->first();
                 
             if ($bid) {
-                $bid->status = Bid::STATUS_ACCEPTED;
-                $bid->save();
+                // Check if status column exists before trying to update it
+                if (Schema::hasColumn('bids', 'status')) {
+                    $bid->status = Bid::STATUS_ACCEPTED;
+                    $bid->save();
+                    
+                    // Reject all other bids if status column exists
+                    Bid::where('order_id', $orderId)
+                        ->where('user_id', '!=', $writerId)
+                        ->update(['status' => Bid::STATUS_REJECTED]);
+                }
             }
             
-            // Reject all other bids
-            Bid::where('order_id', $orderId)
-                ->where('user_id', '!=', $writerId) // Changed from writer_id to user_id
-                ->update(['status' => Bid::STATUS_REJECTED]);
-                // Create system message
+            // Create system message with action buttons for confirmation
             Message::create([
                 'order_id' => $orderId,
-                'user_id' => Auth::id(), // Admin sending the message
+                'user_id' => Auth::id(),
                 'receiver_id' => $writerId,
-                'message' => "You have been assigned to this order. Please review the details and start working.",
+                'message' => "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
+                    <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
+                    <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
+                    <div class='flex space-x-3'>
+                        <a href='".route('writer.orders.confirm', $orderId)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
+                        <a href='".route('writer.orders.reject', $orderId)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
+                    </div>
+                </div>",
                 'message_type' => 'system',
-                'title' => 'Order Assignment'
+                'title' => 'Order Assignment',
+                'requires_action' => true
             ]);
             
             // Notify writer
             $this->notifyWriterOfAssignment($order);
             
+            // Use session flash for toaster
             return redirect()->route('admin.orders.show', $order->id)
                 ->with('toast', [
                     'title' => 'Order Assigned',
-                    'message' => 'Order has been successfully assigned to ' . $writer->name
+                    'message' => 'Order has been assigned to ' . $writer->name . '. Waiting for writer confirmation.'
                 ]);
                 
         } catch (\Exception $e) {
-            Log::error('Error assigning order: ' . $e->getMessage());
+            Log::error('Error assigning order: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
             
             return redirect()->route('admin.bids')
                 ->with('error', 'An error occurred while assigning the order: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Assign order to a writer.
+    **
+     * Helper function to format file size in human-readable format
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param int $bytes
+     * @param int $precision
+     * @return string
+     */
+    private function humanFilesize($bytes, $precision = 2) 
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB']; 
+    
+        $bytes = max($bytes, 0); 
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024)); 
+        $pow = min($pow, count($units) - 1); 
+    
+        $bytes /= pow(1024, $pow);
+    
+        return round($bytes, $precision) . ' ' . $units[$pow]; 
+    }
+
+    
+
+    /**
+     * Writer confirms order assignment
+     *
+     * @param int $id
      * @return \Illuminate\Http\Response
      */
-    public function assign(Request $request, $id)
+    public function confirmAssignment($id)
     {
-        $validator = Validator::make($request->all(), [
-            'writer_id' => 'required|exists:users,id',
-        ]);
-        
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-        
         $order = Order::findOrFail($id);
-        $writerId = $request->input('writer_id');
         
-        // Check if writer exists and is active
-        $writer = User::where('id', $writerId)
-            ->where('usertype', 'writer')
-            ->where('status', 'active')
-            ->first();
-            
-        if (!$writer) {
-            return redirect()->back()
-                ->with('error', 'Selected writer is not available.');
+        // Check if the order belongs to the current writer
+        if ($order->writer_id != Auth::id()) {
+            return redirect()->back()->with('error', 'You are not assigned to this order.');
         }
         
-        // Assign the order
-        $order->writer_id = $writerId;
+        // Check if the order is in UNCONFIRMED status
+        if ($order->status != Order::STATUS_UNCONFIRMED) {
+            return redirect()->back()->with('error', 'This order cannot be confirmed at this time.');
+        }
+        
+        // Update order status
         $order->status = Order::STATUS_CONFIRMED;
         $order->save();
         
-        // If there's a bid from this writer, mark it as accepted
-        $bid = Bid::where('order_id', $id)
-            ->where('user_id', $writerId) // Changed from writer_id to user_id
-            ->first();
-            
-        if ($bid) {
-            $bid->status = Bid::STATUS_ACCEPTED;
-            $bid->save();
-            
-            // Reject all other bids
-            Bid::where('order_id', $id)
-                ->where('user_id', '!=', $writerId) // Changed from writer_id to user_id
-                ->update(['status' => Bid::STATUS_REJECTED]);
+        // Create system message confirming the assignment
+        Message::create([
+            'order_id' => $id,
+            'user_id' => Auth::id(),
+            'message' => "Order assignment has been accepted by the writer.",
+            'message_type' => 'system',
+            'title' => 'Assignment Confirmed'
+        ]);
+        
+        return redirect()->route('writer.orders.show', $id)
+            ->with('success', 'You have successfully accepted this order. You can now start working on it.');
+    }
+    
+    /**
+     * Writer rejects order assignment
+     *
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function rejectAssignment($id)
+    {
+        $order = Order::findOrFail($id);
+        
+        // Check if the order belongs to the current writer
+        if ($order->writer_id != Auth::id()) {
+            return redirect()->back()->with('error', 'You are not assigned to this order.');
         }
         
-        // Notify the writer
-        $this->notifyWriterOfAssignment($order);
+        // Check if the order is in UNCONFIRMED status
+        if ($order->status != Order::STATUS_UNCONFIRMED) {
+            return redirect()->back()->with('error', 'This order cannot be rejected at this time.');
+        }
         
-        // Record admin message about assignment
-        $message = new Message();
-        $message->order_id = $order->id;
-        $message->user_id = Auth::id();
-        $message->receiver_id = $writerId;
-        $message->title = 'Order Assignment';
-        $message->message = 'This order has been assigned to you. Please review the details and begin working on it.';
-        $message->message_type = 'admin';
-        $message->save();
+        // Reset order status and writer
+        $order->status = Order::STATUS_AVAILABLE;
+        $oldWriterId = $order->writer_id;
+        $order->writer_id = null;
+        $order->save();
         
-        return redirect()->back()->with('success', 'Order assigned successfully.');
+        // Create system message recording the rejection
+        Message::create([
+            'order_id' => $id,
+            'user_id' => Auth::id(),
+            'message' => "Order assignment has been declined by the writer.",
+            'message_type' => 'system',
+            'title' => 'Assignment Rejected'
+        ]);
+        
+        // Notify admin about the rejection
+        $adminUsers = User::whereIn('usertype', ['admin', 'super_admin'])->get();
+        foreach ($adminUsers as $admin) {
+            Message::create([
+                'order_id' => $id,
+                'user_id' => Auth::id(),
+                'receiver_id' => $admin->id,
+                'message' => "Writer has declined the order assignment. Order is now available again.",
+                'message_type' => 'notification',
+                'title' => 'Order Assignment Rejected'
+            ]);
+        }
+        
+        return redirect()->route('writer.orders.index')
+            ->with('info', 'You have declined the order assignment.');
     }
 
     /**
@@ -687,6 +849,7 @@ class AdminOrderController extends Controller
             $orderFile->name = $file->getClientOriginalName();
             $orderFile->path = $path;
             $orderFile->size = $file->getSize();
+            $orderFile->fileable_id = $order->id;
             $orderFile->fileable_id = $order->id;
             $orderFile->fileable_type = get_class($order);
             $orderFile->uploaded_by = Auth::id();
@@ -864,7 +1027,8 @@ class AdminOrderController extends Controller
             }
         }
     
-        /**
+        
+         /**
          * Notify writer of order assignment.
          *
          * @param  \App\Models\Order  $order
@@ -877,11 +1041,15 @@ class AdminOrderController extends Controller
             // Send email notification
             try {
                 Mail::to($order->writer->email)->send(new OrderAssigned($order));
+                
+                // Log successful email
+                Log::info('Assignment email sent for order #' . $order->id . ' to writer ' . $order->writer->name);
             } catch (\Exception $e) {
+                // Log error but don't prevent assignment
                 Log::error('Failed to send order assignment email: ' . $e->getMessage());
             }
         }
-    
+            
         /**
          * Notify writer of revision request.
          *
@@ -937,5 +1105,32 @@ class AdminOrderController extends Controller
                 Log::error('Failed to send order disputed email: ' . $e->getMessage());
             }
         }
+        /**
+         * This function should be called from the AdminOrderController when assigning orders to writers
+         * It creates a message with confirmation buttons for the writer
+         *
+         * @param int $orderId
+         * @param int $writerId
+         * @return void
+         */
+        private function sendAssignmentMessageWithButtons($orderId, $writerId)
+        {
+            // Create system message with action buttons for confirmation
+            Message::create([
+                'order_id' => $orderId,
+                'user_id' => Auth::id(),
+                'receiver_id' => $writerId,
+                'message' => "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
+                    <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
+                    <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
+                    <div class='flex space-x-3'>
+                        <a href='".route('writer.orders.confirm', $orderId)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
+                        <a href='".route('writer.orders.reject', $orderId)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
+                    </div>
+                </div>",
+                'message_type' => 'system',
+                'title' => 'Order Assignment',
+                'is_general' => false
+            ]);
+        }
     }
-

@@ -145,7 +145,7 @@
                             <span class="text-sm text-gray-500">Rating</span>
                             <p class="text-lg font-medium text-gray-900">
                                 @if($bid->user && $bid->user->writerProfile && isset($bid->user->writerProfile->rating))
-                                    <span <span class="text-yellow-500">
+                                    <span class="text-yellow-500">
                                         @for($i = 1; $i <= 5; $i++)
                                             @if($i <= round($bid->user->writerProfile->rating))
                                                 <i class="fas fa-star"></i>
@@ -217,6 +217,7 @@
     </div>
 </div>
 
+<!-- First toast notification (Alpine.js version) -->
 @if(session('toast'))
 <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" 
     class="fixed top-4 right-4 z-50 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-lg flex items-start max-w-sm transform transition-transform duration-300 ease-in-out">
@@ -235,6 +236,68 @@
         </svg>
     </button>
 </div>
+@endif
+
+<!-- Second toast notification (Vanilla JS version) -->
+@if(session('toast'))
+<div id="toast-notification" 
+     class="fixed top-4 right-4 z-50 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-lg flex items-start max-w-sm transform transition-transform duration-300 ease-in-out translate-x-full">
+    <div class="text-green-500 mr-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+    </div>
+    <div>
+        <p class="font-medium text-green-800">{{ session('toast.title') }}</p>
+        <p class="text-sm text-green-700 mt-1">{{ session('toast.message') }}</p>
+    </div>
+    <button onclick="closeToast()" class="ml-auto text-green-500 hover:text-green-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
+</div>
+
+<script>
+    // Show toast notification
+    function showToast() {
+        const toast = document.getElementById('toast-notification');
+        if (toast) {
+            // First make sure it's visible
+            toast.classList.remove('hidden');
+            
+            // Wait a tiny bit to allow a DOM refresh, then animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 10);
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                closeToast();
+            }, 5000);
+        }
+    }
+    
+    // Hide toast notification
+    function closeToast() {
+        const toast = document.getElementById('toast-notification');
+        if (toast) {
+            toast.classList.add('translate-x-full');
+            
+            // Remove from DOM after animation completes
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
+        }
+    }
+    
+    // Show toast when page loads if session has toast data
+    @if(session('toast'))
+    document.addEventListener('DOMContentLoaded', function() {
+        showToast();
+    });
+    @endif
+</script>
 @endif
 
 @endsection

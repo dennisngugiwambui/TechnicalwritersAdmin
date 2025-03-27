@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'TechnicalWriters Admin') }} - @yield('title', 'Dashboard')</title>
+    <link rel="icon" type="image/jpeg" href="images/technicalwriters2.jpg">
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
