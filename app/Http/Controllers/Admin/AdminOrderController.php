@@ -246,6 +246,16 @@ class AdminOrderController extends Controller
         // Send notification to writer if assigned
         if ($request->input('writer_id')) {
             $this->notifyWriterOfAssignment($order);
+            
+            // Create assignment message
+            $message = new Message();
+            $message->order_id = $order->id;
+            $message->user_id = Auth::id();
+            $message->receiver_id = $request->input('writer_id');
+            $message->title = 'Order Assignment';
+            $message->message = "Please check this order {$order->id} and let us know if you can finish it by the deadline and inform us incase anything is missing. You may also send a message to the customer if the order contains contradictory information.";
+            $message->message_type = 'admin';
+            $message->save();
         }
         
         return redirect()->route('admin.orders.show', $order->id)
@@ -384,7 +394,7 @@ class AdminOrderController extends Controller
         return redirect()->back()->with('error', 'Order cannot be made available.');
     }
 
-     /**
+    /**
      * Assign order to a writer.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -441,37 +451,23 @@ class AdminOrderController extends Controller
                 }
             }
             
-            // Notify the writer via email
-            try {
-                Mail::to($writer->email)->send(new OrderAssigned($order));
-                Log::info('Assignment email sent for order #' . $order->id . ' to writer ' . $writer->name);
-            } catch (\Exception $e) {
-                Log::error('Failed to send order assignment email: ' . $e->getMessage());
-            }
+            // Notify the writer
+            $this->notifyWriterOfAssignment($order);
             
-            // Record admin message about assignment with action buttons
+            // Record admin message about assignment
             $message = new Message();
             $message->order_id = $order->id;
             $message->user_id = Auth::id();
             $message->receiver_id = $writerId;
             $message->title = 'Order Assignment';
-            $message->message = "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
-                <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
-                <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
-                <div class='flex space-x-3'>
-                    <a href='".route('writer.confirm.assignment', $order->id)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
-                    <a href='".route('writer.reject.assignment', $order->id)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
-                </div>
-            </div>";
+            $message->message = "Please check this order {$order->id} and let us know if you can finish it by the deadline and inform us incase anything is missing. You may also send a message to the customer if the order contains contradictory information.";
             $message->message_type = 'admin';
-            $message->requires_action = true;
-            $message->is_general = false;
             $message->save();
             
             // Use toast notification
             return redirect()->back()->with('toast', [
                 'title' => 'Order Assigned',
-                'message' => 'Order has been assigned to ' . $writer->name . '. Waiting for writer confirmation.'
+                'message' => 'Order has been successfully assigned to ' . $writer->name
             ]);
         } catch (\Exception $e) {
             Log::error('Error assigning order: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
@@ -482,15 +478,6 @@ class AdminOrderController extends Controller
     }
 
     /**
-     * Assign order to a writer from the bid page.
-     *
-     * @param  int  $orderId
-     * @param  int  $writerId
-     * @return \Illuminate\Http\Response
-     */
-
-    
-   /**
      * Assign order to a writer from the bid page.
      *
      * @param  int  $orderId
@@ -522,42 +509,36 @@ class AdminOrderController extends Controller
             if ($bid) {
                 // Check if status column exists before trying to update it
                 if (Schema::hasColumn('bids', 'status')) {
-                    $bid->status = Bid::STATUS_ACCEPTED;
+                    $bid->status = 'accepted';
                     $bid->save();
                     
                     // Reject all other bids if status column exists
                     Bid::where('order_id', $orderId)
                         ->where('user_id', '!=', $writerId)
-                        ->update(['status' => Bid::STATUS_REJECTED]);
+                        ->update(['status' => 'rejected']);
                 }
             }
             
-            // Create system message with action buttons for confirmation
+            // Notify writer
+            $this->notifyWriterOfAssignment($order);
+            
+            // Create system message
             Message::create([
                 'order_id' => $orderId,
                 'user_id' => Auth::id(),
                 'receiver_id' => $writerId,
-                'message' => "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
-                    <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
-                    <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
-                    <div class='flex space-x-3'>
-                        <a href='".route('writer.orders.confirm', $orderId)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
-                        <a href='".route('writer.orders.reject', $orderId)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
-                    </div>
-                </div>",
+                'message' => "Please check this order {$orderId} and let us know if you can finish it by the deadline and inform us incase anything is missing. You may also send a message to the customer if the order contains contradictory information.",
                 'message_type' => 'system',
                 'title' => 'Order Assignment',
+                'is_general' => false,
                 'requires_action' => true
             ]);
-            
-            // Notify writer
-            $this->notifyWriterOfAssignment($order);
             
             // Use session flash for toaster
             return redirect()->route('admin.orders.show', $order->id)
                 ->with('toast', [
                     'title' => 'Order Assigned',
-                    'message' => 'Order has been assigned to ' . $writer->name . '. Waiting for writer confirmation.'
+                    'message' => 'Order has been successfully assigned to ' . $writer->name
                 ]);
                 
         } catch (\Exception $e) {
@@ -568,7 +549,7 @@ class AdminOrderController extends Controller
         }
     }
 
-    **
+    /**
      * Helper function to format file size in human-readable format
      *
      * @param int $bytes
@@ -587,8 +568,6 @@ class AdminOrderController extends Controller
     
         return round($bytes, $precision) . ' ' . $units[$pow]; 
     }
-
-    
 
     /**
      * Writer confirms order assignment
@@ -850,7 +829,6 @@ class AdminOrderController extends Controller
             $orderFile->path = $path;
             $orderFile->size = $file->getSize();
             $orderFile->fileable_id = $order->id;
-            $orderFile->fileable_id = $order->id;
             $orderFile->fileable_type = get_class($order);
             $orderFile->uploaded_by = Auth::id();
             $orderFile->save();
@@ -1001,136 +979,83 @@ class AdminOrderController extends Controller
         return redirect()->back()->with('success', 'Message sent as support.');
     }
     
+   
+    
     /**
-     * Initiate scraping process for orders.
+     * Notify writer of order assignment.
      *
-     * @return \Illuminate\Http\Response
+     * @param  \App\Models\Order  $order
+     * @return void
      */
-    public function scrapeOrders()
+    protected function notifyWriterOfAssignment($order)
     {
-        try {
-            $scrapingService = new OrderScrapingService();
-            $result = $scrapingService->scrapeOrders();
-            
-            if ($result['success']) {
-                return redirect()->route('admin.orders.index')
-                    ->with('success', $result['count'] . ' orders scraped successfully.');
-            } else {
-                return redirect()->route('admin.orders.index')
-                    ->with('error', 'Error scraping orders: ' . $result['message']);
-                }
-            } catch (\Exception $e) {
-                Log::error('Order scraping error: ' . $e->getMessage());
-                
-                return redirect()->route('admin.orders.index')
-                    ->with('error', 'Error scraping orders: ' . $e->getMessage());
-            }
-        }
-    
+        if (!$order->writer) return;
         
-         /**
-         * Notify writer of order assignment.
-         *
-         * @param  \App\Models\Order  $order
-         * @return void
-         */
-        protected function notifyWriterOfAssignment($order)
-        {
-            if (!$order->writer) return;
+        // Send email notification
+        try {
+            Mail::to($order->writer->email)->send(new OrderAssigned($order));
             
-            // Send email notification
-            try {
-                Mail::to($order->writer->email)->send(new OrderAssigned($order));
-                
-                // Log successful email
-                Log::info('Assignment email sent for order #' . $order->id . ' to writer ' . $order->writer->name);
-            } catch (\Exception $e) {
-                // Log error but don't prevent assignment
-                Log::error('Failed to send order assignment email: ' . $e->getMessage());
-            }
-        }
-            
-        /**
-         * Notify writer of revision request.
-         *
-         * @param  \App\Models\Order  $order
-         * @param  string  $comments
-         * @return void
-         */
-        protected function notifyWriterOfRevision($order, $comments)
-        {
-            if (!$order->writer) return;
-            
-            // Send email notification
-            try {
-                Mail::to($order->writer->email)->send(new RevisionRequested($order, $comments));
-            } catch (\Exception $e) {
-                Log::error('Failed to send revision request email: ' . $e->getMessage());
-            }
-        }
-    
-        /**
-         * Notify writer of order completion.
-         *
-         * @param  \App\Models\Order  $order
-         * @return void
-         */
-        protected function notifyWriterOfCompletion($order)
-        {
-            if (!$order->writer) return;
-            
-            // Send email notification
-            try {
-                Mail::to($order->writer->email)->send(new OrderCompleted($order));
-            } catch (\Exception $e) {
-                Log::error('Failed to send order completion email: ' . $e->getMessage());
-            }
-        }
-    
-        /**
-         * Notify writer of order dispute.
-         *
-         * @param  \App\Models\Order  $order
-         * @param  string  $reason
-         * @return void
-         */
-        protected function notifyWriterOfDispute($order, $reason)
-        {
-            if (!$order->writer) return;
-            
-            // Send email notification
-            try {
-                Mail::to($order->writer->email)->send(new OrderDisputed($order, $reason));
-            } catch (\Exception $e) {
-                Log::error('Failed to send order disputed email: ' . $e->getMessage());
-            }
-        }
-        /**
-         * This function should be called from the AdminOrderController when assigning orders to writers
-         * It creates a message with confirmation buttons for the writer
-         *
-         * @param int $orderId
-         * @param int $writerId
-         * @return void
-         */
-        private function sendAssignmentMessageWithButtons($orderId, $writerId)
-        {
-            // Create system message with action buttons for confirmation
-            Message::create([
-                'order_id' => $orderId,
-                'user_id' => Auth::id(),
-                'receiver_id' => $writerId,
-                'message' => "<div class='bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-4'>
-                    <h4 class='font-medium text-yellow-800 mb-2'>Order Assignment</h4>
-                    <p class='text-yellow-700 mb-4'>You have been assigned to this order. Please review the details and confirm if you accept this assignment.</p>
-                    <div class='flex space-x-3'>
-                        <a href='".route('writer.orders.confirm', $orderId)."' class='px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'>Accept Assignment</a>
-                        <a href='".route('writer.orders.reject', $orderId)."' class='px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'>Decline Assignment</a>
-                    </div>
-                </div>",
-                'message_type' => 'system',
-                'title' => 'Order Assignment',
-                'is_general' => false
-            ]);
+            // Log successful email
+            Log::info('Assignment email sent for order #' . $order->id . ' to writer ' . $order->writer->name);
+        } catch (\Exception $e) {
+            // Log error but don't prevent assignment
+            Log::error('Failed to send order assignment email: ' . $e->getMessage());
         }
     }
+        
+    /**
+     * Notify writer of revision request.
+     *
+     * @param  \App\Models\Order  $order
+     * @param  string  $comments
+     * @return void
+     */
+    protected function notifyWriterOfRevision($order, $comments)
+    {
+        if (!$order->writer) return;
+        
+        // Send email notification
+        try {
+            Mail::to($order->writer->email)->send(new RevisionRequested($order, $comments));
+        } catch (\Exception $e) {
+            Log::error('Failed to send revision request email: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notify writer of order completion.
+     *
+     * @param  \App\Models\Order  $order
+     * @return void
+     */
+    protected function notifyWriterOfCompletion($order)
+    {
+        if (!$order->writer) return;
+        
+        // Send email notification
+        try {
+            Mail::to($order->writer->email)->send(new OrderCompleted($order));
+        } catch (\Exception $e) {
+            Log::error('Failed to send order completion email: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notify writer of order dispute.
+     *
+     * @param  \App\Models\Order  $order
+     * @param  string  $reason
+     * @return void
+     */
+    protected function notifyWriterOfDispute($order, $reason)
+    {
+        if (!$order->writer) return;
+        
+        // Send email notification
+        try {
+            Mail::to($order->writer->email)->send(new OrderDisputed($order, $reason));
+        } catch (\Exception $e) {
+            Log::error('Failed to send order disputed email: ' . $e->getMessage());
+        }
+    }
+}

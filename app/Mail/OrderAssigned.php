@@ -107,7 +107,7 @@ Technical Writers Team");
     protected function replacePlaceholders($content)
     {
         $writerName = $this->order->writer ? $this->order->writer->name : 'Writer';
-        $writerDashboardUrl = route('home');
+        $writerDashboardUrl = route('writer.orders.show', $this->order->id);
         $orderDeadline = $this->order->deadline ? $this->order->deadline->format('F j, Y, g:i a') : 'Not specified';
         
         $replacements = [

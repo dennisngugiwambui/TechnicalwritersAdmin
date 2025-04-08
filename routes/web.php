@@ -15,10 +15,11 @@ use App\Http\Controllers\FileController;
 // Update this line to match your actual controller location
 use App\Http\Controllers\Admin\AdminOrderController;
 
-// Public routes
+// Public routes+
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
 
 // Authentication routes (without register)
 Auth::routes(['register' => false]);
