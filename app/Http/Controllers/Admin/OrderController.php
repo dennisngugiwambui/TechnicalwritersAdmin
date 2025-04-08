@@ -1169,7 +1169,7 @@ class OrderController extends Controller
          *
          * @param  \Illuminate\Http\Request  $request
          * @return \Illuminate\Http\JsonResponse
-         * @return \Ill
+         * @return \Illuminate\
          */
         public function getStatistics(Request $request)
         {
