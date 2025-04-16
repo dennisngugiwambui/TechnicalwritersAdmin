@@ -154,19 +154,31 @@ class OrderController extends Controller
         ]);
         
         // Handle file uploads
+       // Handle file uploads
         if ($request->hasFile('files')) {
+            // Create storage directory if it doesn't exist
+            $storageDirectory = 'order_files/' . $order->id;
+            $fullPath = storage_path('app/public/' . $storageDirectory);
+            
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
+            
             foreach ($request->file('files') as $file) {
-                $filename = $file->getClientOriginalName();
-                $path = $file->store('order_files');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs($storageDirectory, $filename, 'public');
                 
                 // Create the file record
                 File::create([
-                    'name' => $filename,
+                    'name' => $file->getClientOriginalName(),
+                    'original_name' => $file->getClientOriginalName(),
                     'path' => $path,
                     'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
                     'fileable_id' => $order->id,
                     'fileable_type' => Order::class,
-                    'uploaded_by' => Auth::id()
+                    'uploaded_by' => Auth::id(),
+                    'uploader_type' => 'admin'
                 ]);
             }
         }
@@ -232,6 +244,106 @@ class OrderController extends Controller
             ->update(['read_at' => now()]);
         
         return view('admin.orders.show', compact('order', 'writers', 'statusHistory'));
+    }
+
+    /**
+     * Display files for a specific order.
+     *
+     * @param  \App\Models\Order  $order
+     * @return \Illuminate\View\View
+     */
+    public function showFiles(Order $order)
+    {
+        // Format file data for the view
+        $files = $order->files->map(function($file) {
+            return [
+                'id' => $file->id,
+                'name' => $file->original_name ?? $file->name,
+                'size' => $this->formatFileSize($file->size),
+                'uploaded_by' => $file->uploader_type ?? ($file->uploaded_by == $order->writer_id ? 'WRITER' : 'ADMIN'),
+                'uploaded_at' => $file->created_at->format('M d, Y h:i A'),
+                'description' => $file->description,
+                'mime_type' => $file->mime_type
+            ];
+        });
+        
+        return view('admin.orders.files', compact('order', 'files'));
+    }
+
+    /**
+     * Format file size in human-readable format
+     *
+     * @param  int  $bytes
+     * @param  int  $precision
+     * @return string
+     */
+    private function formatFileSize($bytes, $precision = 2)
+    {
+        if ($bytes === 0) {
+            return '0 B';
+        }
+        
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = floor(log($bytes, 1024));
+        
+        return round($bytes / pow(1024, $i), $precision) . ' ' . $units[$i];
+    }
+    /**
+     * Download multiple files as a ZIP
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function downloadMultipleFiles(Request $request)
+    {
+        try {
+            $request->validate([
+                'file_ids' => 'required|array',
+                'file_ids.*' => 'exists:files,id'
+            ]);
+            
+            $fileIds = $request->file_ids;
+            
+            // Get the files
+            $files = File::whereIn('id', $fileIds)->get();
+            
+            // Create a temporary zip file
+            $zipFileName = 'order-files-' . time() . '.zip';
+            $tempPath = storage_path('app/public/temp');
+            
+            // Create temp directory if it doesn't exist
+            if (!file_exists($tempPath)) {
+                mkdir($tempPath, 0755, true);
+            }
+            
+            $zipPath = $tempPath . '/' . $zipFileName;
+            
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE) !== true) {
+                throw new \Exception('Cannot create zip file');
+            }
+            
+            // Add files to the zip
+            foreach ($files as $file) {
+                if (Storage::disk('public')->exists($file->path)) {
+                    $fileContent = Storage::disk('public')->get($file->path);
+                    $zip->addFromString($file->original_name, $fileContent);
+                }
+            }
+            
+            $zip->close();
+            
+            // Return the zip file
+            return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+            
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error downloading multiple files: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error downloading files: ' . $e->getMessage()
+            ], 500);
+        }
     }
     
     /**
@@ -303,19 +415,31 @@ class OrderController extends Controller
         ]);
         
         // Handle file uploads
+        // Handle file uploads
         if ($request->hasFile('files')) {
+            // Create storage directory if it doesn't exist
+            $storageDirectory = 'order_files/' . $order->id;
+            $fullPath = storage_path('app/public/' . $storageDirectory);
+            
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
+            
             foreach ($request->file('files') as $file) {
-                $filename = $file->getClientOriginalName();
-                $path = $file->store('order_files');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs($storageDirectory, $filename, 'public');
                 
                 // Create the file record
                 File::create([
-                    'name' => $filename,
+                    'name' => $file->getClientOriginalName(),
+                    'original_name' => $file->getClientOriginalName(),
                     'path' => $path,
                     'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
                     'fileable_id' => $order->id,
                     'fileable_type' => Order::class,
-                    'uploaded_by' => Auth::id()
+                    'uploaded_by' => Auth::id(),
+                    'uploader_type' => 'ADMIN'
                 ]);
             }
         }
@@ -737,25 +861,37 @@ class OrderController extends Controller
         $validated = $request->validate([
             'order_id' => 'required|exists:orders,id',
             'file_description' => 'required|string',
-            'files.*' => 'required|file|max:10240', // Max 10MB per file
+            'files.*' => 'required|file|max:99000', // 99MB max
         ]);
         
         $order = Order::findOrFail($validated['order_id']);
         
         // Handle file uploads
         if ($request->hasFile('files')) {
+            // Create storage directory if it doesn't exist
+            $storageDirectory = 'order_files/' . $order->id;
+            $fullPath = storage_path('app/public/' . $storageDirectory);
+            
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
+            
             foreach ($request->file('files') as $file) {
-                $filename = $file->getClientOriginalName();
-                $path = $file->store('order_files');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs($storageDirectory, $filename, 'public');
                 
                 // Create the file record
                 File::create([
-                    'name' => $filename,
+                    'name' => $file->getClientOriginalName(),
+                    'original_name' => $file->getClientOriginalName(),
                     'path' => $path,
                     'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
                     'fileable_id' => $order->id,
                     'fileable_type' => Order::class,
-                    'uploaded_by' => Auth::id()
+                    'uploaded_by' => Auth::id(),
+                    'uploader_type' => 'ADMIN',
+                    'description' => $validated['file_description']
                 ]);
             }
             
@@ -775,6 +911,7 @@ class OrderController extends Controller
         
         return redirect()->back()->with('error', 'No files were uploaded.');
     }
+   
     
     /**
      * Resolve a disputed order.
@@ -1169,7 +1306,7 @@ class OrderController extends Controller
          *
          * @param  \Illuminate\Http\Request  $request
          * @return \Illuminate\Http\JsonResponse
-         * @
+         * 
          */
         public function getStatistics(Request $request)
         {

@@ -336,9 +336,9 @@
                                            {{ $file->created_at->format('M d, Y') }}
                                        </td>
                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                           <a href="{{ route('files.download', $file->id) }}" class="text-primary-600 hover:text-primary-900">
-                                               <i class="fas fa-download"></i> Download
-                                           </a>
+                                            <a href="{{ route('admin.files.download', ['file' => $file['id']]) }}" class="text-primary-600 hover:text-primary-900 mr-4">
+                                                <i class="fas fa-download"></i> Download
+                                            </a>
                                        </td>
                                    </tr>
                                @endforeach

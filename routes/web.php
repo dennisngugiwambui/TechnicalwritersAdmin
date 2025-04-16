@@ -52,7 +52,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     // Dashboard
     Route::get('/', [AdminHomeController::class, 'index'])->name('dashboard');
     
-    // Orders Management
+    // Orders Manageme
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/create', [OrderController::class, 'create'])->name('orders.create');
     Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
@@ -116,6 +116,15 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::post('/payments/{payment}/process-mpesa', [PaymentController::class, 'processMpesa'])->name('payments.process-mpesa');
+
+    // File Management
+    // File Management - Update to use FileController for downloads
+    Route::get('/orders/{order}/files', [OrderController::class, 'showFiles'])->name('orders.files');
+    Route::post('/orders/upload-files', [OrderController::class, 'uploadFiles'])->name('orders.upload-files');
+    
+    // Use FileController for downloads instead of OrderController
+    Route::get('/files/{file}/download', [FileController::class, 'adminDownload'])->name('files.download');
+    Route::post('/files/download-multiple', [FileController::class, 'adminDownloadMultiple'])->name('files.download-multiple');
     
     // Finance Management (New routes)
     Route::prefix('finance')->name('finance.')->group(function () {
@@ -164,10 +173,7 @@ Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () 
     Route::post('/messages/ajax-reply/{conversationId}', [MessageController::class, 'ajaxReply'])->name('messages.ajax-reply');
 });
 
-// Order files download route
-Route::get('/files/{file}/download', [FileController::class, 'download'])
-    ->name('files.download')
-    ->middleware('auth');
+
 
 // Writer routes
 Route::middleware(['auth', 'check.order.ownership'])->group(function () {
@@ -190,3 +196,5 @@ Route::post('/api/mpesa/b2c/timeout', [MpesaController::class, 'handleTimeout'])
 Route::post('/api/mpesa/callback', [MpesaController::class, 'handleCallback'])->name('mpesa.callback');
 Route::post('/api/mpesa/timeout', [MpesaController::class, 'handleTimeout'])->name('mpesa.timeout');
 Route::post('/api/mpesa/result', [MpesaController::class, 'handleResult'])->name('mpesa.result');
+
+
