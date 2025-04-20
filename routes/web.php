@@ -42,7 +42,7 @@ Route::get('/failed', function() {
 // Dashboard route
 Route::get('/home', [AdminHomeController::class, 'index'])->name('home');
 
-// Dashboard chart data
+// Dashboard chart dat
 Route::get('/admin/dashboard/chart-data', [AdminHomeController::class, 'getChartData'])
     ->name('admin.dashboard.chart-data')
     ->middleware('auth');
