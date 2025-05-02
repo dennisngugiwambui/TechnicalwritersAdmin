@@ -47,7 +47,7 @@ Route::get('/admin/dashboard/chart-data', [AdminHomeController::class, 'getChart
     ->name('admin.dashboard.chart-data')
     ->middleware('auth');
 
-// Admin routes a
+// Admin routes
 Route::prefix('admin')->middleware(['auth'])->name('admin.')->group(function () {
     // Dashboard
     Route::get('/', [AdminHomeController::class, 'index'])->name('dashboard');
